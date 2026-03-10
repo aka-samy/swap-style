@@ -1,11 +1,7 @@
 [build]
-builder = "nixpacks"
-buildCommand = "cd api && npm ci && npx prisma generate && npm run build"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "cd api && npx prisma migrate deploy && node dist/main.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-[service]
-rootDirectory = "/"
