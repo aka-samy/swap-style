@@ -1,0 +1,24 @@
+Downloading Material fonts...                                       8.4s
+Downloading Material fonts...                                       6.8s
+Downloading Gradle Wrapper...                                      194ms
+Downloading package sky_engine...                                  677ms
+Downloading package flutter_gpu...                                 171ms
+Downloading flutter_patched_sdk tools...                         1,227ms
+Downloading flutter_patched_sdk_product tools...                 1,409ms
+Downloading windows-x64 tools...                                   10.1s
+Downloading windows-x64/font-subset tools...                       781ms
+Resolving dependencies...
+The Flutter CLI developer tool uses Google Analytics to report usage and diagnostic
+data along with package dependencies, and crash reporting to send basic crash
+reports. This data is used to help improve the Dart platform, Flutter framework,
+and related tools.
+
+Telemetry is not sent on the very first run. To disable reporting of telemetry,
+run this terminal command:
+
+    flutter --disable-analytics
+
+If you opt out of telemetry, an opt-out event will be sent, and then no further
+information will be sent. This data is collected in accordance with the Google
+Privacy Policy (https://policies.google.com/privacy).
+

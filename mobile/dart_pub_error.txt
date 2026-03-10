@@ -1,0 +1,7 @@
+Waiting for another flutter command to release the startup lock...
+Because swap_style depends on appinio_swiper ^7.0.0 which doesn't match any versions, version solving failed.
+
+
+You can try the following suggestion to make the pubspec resolve:
+* Consider downgrading your constraint on appinio_swiper: flutter pub add appinio_swiper:^2.1.1
+Failed to update packages.

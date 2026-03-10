@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────
+
+enum ItemCategory {
+  Shirt
+  Hoodie
+  Pants
+  Shoes
+  Jacket
+  Dress
+  Accessories
+  Other
+}
+
+enum ItemSize {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+  ONE_SIZE
+}
+
+enum ItemCondition {
+  New
+  LikeNew
+  Good
+  Fair
+}
+
+enum ItemStatus {
+  available
+  swapped
+  removed
+}
+
+enum MatchStatus {
+  pending
+  negotiating
+  agreed
+  awaiting_confirmation
+  completed
+  canceled
+  expired
+}
+
+enum CounterOfferStatus {
+  pending
+  accepted
+  declined
+  superseded
+}
+
+enum CounterOfferItemDirection {
+  offered
+  requested
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  resolved
+}
+
+enum NotificationType {
+  match
+  message
+  counter_offer
+  swap_completed
+  match_expiry_warning
+  match_expired
+  rating_prompt
+}
+
+enum BadgeCriteriaType {
+  swap_count
+  streak_days
+  rating_count
+}
+
+// ─── Models ─────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  displayName      String   @map("name")
+  bio              String?
+  profilePhotoUrl  String?  @map("profile_photo_url")
+  city             String?
+  latitude         Float?
+  longitude        Float?
+  emailVerified    Boolean  @default(false) @map("email_verified")
+  phoneVerified    Boolean  @default(false) @map("phone_verified")
+  phoneNumber      String?  @map("phone_number")
+  firebaseUid      String   @unique @map("firebase_uid")
+  fcmToken         String?  @map("fcm_token")
+  timezone         String   @default("UTC")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  items            Item[]
+  likes            Like[]
+  matchesAsA       Match[]         @relation("MatchUserA")
+  matchesAsB       Match[]         @relation("MatchUserB")
+  counterOffers    CounterOffer[]
+  sentMessages     Message[]
+  givenRatings     Rating[]        @relation("RatingRater")
+  receivedRatings  Rating[]        @relation("RatingRated")
+  streak           Streak?
+  userBadges       UserBadge[]
+  filedReports     Report[]        @relation("ReportReporter")
+  reportsAgainst   Report[]        @relation("ReportReported")
+  blocksInitiated  Block[]         @relation("BlockBlocker")
+  blocksReceived   Block[]         @relation("BlockBlocked")
+  wishlistEntries  WishlistEntry[]
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+model Item {
+  id        String        @id @default(uuid())
+  ownerId   String        @map("owner_id")
+  category  ItemCategory
+  brand     String
+  size      ItemSize
+  condition ItemCondition
+  notes     String?
+  status    ItemStatus    @default(available)
+  latitude  Float
+  longitude Float
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  owner             User               @relation(fields: [ownerId], references: [id])
+  photos            ItemPhoto[]
+  verification      ItemVerification?
+  likes             Like[]
+  matchesAsItemA    Match[]            @relation("MatchItemA")
+  matchesAsItemB    Match[]            @relation("MatchItemB")
+  counterOfferItems CounterOfferItem[]
+  reports           Report[]
+
+  @@index([ownerId, status])
+  @@index([size, category, status])
+  @@map("items")
+}
+
+model ItemPhoto {
+  id           String   @id @default(uuid())
+  itemId       String   @map("item_id")
+  url          String
+  thumbnailUrl String   @map("thumbnail_url")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("item_photos")
+}
+
+model ItemVerification {
+  id             String    @id @default(uuid())
+  itemId         String    @unique @map("item_id")
+  washed         Boolean   @default(false) @map("is_washed")
+  noStains       Boolean   @default(false) @map("no_stains")
+  noTears        Boolean   @default(false) @map("no_tears")
+  noDefects      Boolean   @default(false) @map("no_defects")
+  photosAccurate Boolean   @default(false) @map("photos_accurate")
+  verifiedAt     DateTime? @map("verified_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("item_verifications")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  likerId   String   @map("liker_id")
+  itemId    String   @map("item_id")
+  isLike    Boolean  @map("is_like")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  liker User @relation(fields: [likerId], references: [id])
+  item  Item @relation(fields: [itemId], references: [id])
+
+  @@unique([likerId, itemId])
+  @@index([itemId, isLike])
+  @@map("likes")
+}
+
+model Match {
+  id             String      @id @default(uuid())
+  userAId        String      @map("user_a_id")
+  userBId        String      @map("user_b_id")
+  itemAId        String      @map("item_a_id")
+  itemBId        String      @map("item_b_id")
+  status         MatchStatus @default(pending)
+  userAConfirmed Boolean     @default(false) @map("user_a_confirmed")
+  userBConfirmed Boolean     @default(false) @map("user_b_confirmed")
+  lastActivityAt DateTime    @default(now()) @map("last_activity_at")
+  expiredAt      DateTime?   @map("expired_at")
+  completedAt    DateTime?   @map("completed_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  userA         User           @relation("MatchUserA", fields: [userAId], references: [id])
+  userB         User           @relation("MatchUserB", fields: [userBId], references: [id])
+  itemA         Item           @relation("MatchItemA", fields: [itemAId], references: [id])
+  itemB         Item           @relation("MatchItemB", fields: [itemBId], references: [id])
+  counterOffers CounterOffer[]
+  messages      Message[]
+  ratings       Rating[]
+  notifications Notification[]
+
+  @@unique([userAId, userBId, itemAId, itemBId])
+  @@index([userAId, status])
+  @@index([userBId, status])
+  @@index([status, lastActivityAt])
+  @@map("matches")
+}
+
+model CounterOffer {
+  id             String             @id @default(uuid())
+  matchId        String             @map("match_id")
+  proposerId     String             @map("proposer_id")
+  monetaryAmount Float?             @map("monetary_amount")
+  message        String?
+  status         CounterOfferStatus @default(pending)
+  round          Int                @map("round_number")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  match    Match              @relation(fields: [matchId], references: [id])
+  proposer User               @relation(fields: [proposerId], references: [id])
+  items    CounterOfferItem[]
+
+  @@map("counter_offers")
+}
+
+model CounterOfferItem {
+  id             String                    @id @default(uuid())
+  counterOfferId String                    @map("counter_offer_id")
+  itemId         String                    @map("item_id")
+  direction      CounterOfferItemDirection @default(offered)
+
+  counterOffer CounterOffer @relation(fields: [counterOfferId], references: [id], onDelete: Cascade)
+  item         Item         @relation(fields: [itemId], references: [id])
+
+  @@map("counter_offer_items")
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  matchId   String    @map("match_id")
+  senderId  String    @map("sender_id")
+  text      String    @map("content")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  match  Match @relation(fields: [matchId], references: [id])
+  sender User  @relation(fields: [senderId], references: [id])
+
+  @@index([matchId, createdAt])
+  @@index([matchId, senderId, readAt])
+  @@map("messages")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  matchId   String   @map("match_id")
+  raterId   String   @map("rater_id")
+  rateeId   String   @map("rated_user_id")
+  score     Int      @map("stars")
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  match  Match @relation(fields: [matchId], references: [id])
+  rater  User  @relation("RatingRater", fields: [raterId], references: [id])
+  ratee  User  @relation("RatingRated", fields: [rateeId], references: [id])
+
+  @@unique([matchId, raterId])
+  @@index([rateeId])
+  @@map("ratings")
+}
+
+model Streak {
+  id             String    @id @default(uuid())
+  userId         String    @unique @map("user_id")
+  currentStreak  Int       @default(0) @map("current_count")
+  longestStreak  Int       @default(0) @map("longest_count")
+  lastActivityAt DateTime? @map("last_activity_date")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("streaks")
+}
+
+model Badge {
+  id            String            @id @default(uuid())
+  slug          String            @unique
+  name          String
+  description   String
+  iconUrl       String            @map("icon_url")
+  criteriaType  BadgeCriteriaType @map("criteria_type")
+  criteriaValue Int               @map("criteria_value")
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  badgeId   String   @map("badge_id")
+  awardedAt DateTime @default(now()) @map("earned_at")
+
+  user  User  @relation(fields: [userId], references: [id])
+  badge Badge @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String       @map("reporter_id")
+  reportedUserId String?      @map("reported_user_id")
+  reportedItemId String?      @map("reported_item_id")
+  reason         String
+  details        String?
+  status         ReportStatus @default(pending)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  resolvedAt     DateTime?    @map("resolved_at")
+
+  reporter     User  @relation("ReportReporter", fields: [reporterId], references: [id])
+  reportedUser User? @relation("ReportReported", fields: [reportedUserId], references: [id])
+  reportedItem Item? @relation(fields: [reportedItemId], references: [id])
+
+  @@map("reports")
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlockBlocker", fields: [blockerId], references: [id])
+  blocked User @relation("BlockBlocked", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@map("blocks")
+}
+
+model WishlistEntry {
+  id        String        @id @default(uuid())
+  userId    String        @map("user_id")
+  category  ItemCategory?
+  size      ItemSize?
+  brand     String?
+  notes     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("wishlist_entries")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  type        NotificationType
+  title       String
+  body        String
+  referenceId String?          @map("reference_id")
+  matchId     String?          @map("match_id")
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id])
+  match Match? @relation(fields: [matchId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}

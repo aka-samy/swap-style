@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma
+api/prisma/migrations/**/migration_lock.toml
+
+# Firebase
+firebase-service-account.json
+google-services.json
+swap-style-*.json
+
+# Flutter
+mobile/.dart_tool/
+mobile/.packages
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Misc
+*.tmp
