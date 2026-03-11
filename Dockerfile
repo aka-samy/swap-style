@@ -14,7 +14,6 @@ COPY api/ ./
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 RUN npm run build
-RUN ls -la dist/ && ls -la dist/main.js
 
 # Production stage
 FROM node:20-alpine
