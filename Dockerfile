@@ -10,6 +10,8 @@ RUN npm ci
 COPY api/ ./
 
 # Generate Prisma client and build
+# Dummy DATABASE_URL needed for prisma generate (no actual connection made)
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 RUN npm run build
 
