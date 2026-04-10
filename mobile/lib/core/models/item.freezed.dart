@@ -25,6 +25,7 @@ mixin _$Item {
   ItemCategory get category => throw _privateConstructorUsedError;
   String get brand => throw _privateConstructorUsedError;
   ItemSize get size => throw _privateConstructorUsedError;
+  double? get shoeSizeEu => throw _privateConstructorUsedError;
   ItemCondition get condition => throw _privateConstructorUsedError;
   String? get notes => throw _privateConstructorUsedError;
   double get latitude => throw _privateConstructorUsedError;
@@ -55,6 +56,7 @@ abstract class $ItemCopyWith<$Res> {
       ItemCategory category,
       String brand,
       ItemSize size,
+      double? shoeSizeEu,
       ItemCondition condition,
       String? notes,
       double latitude,
@@ -88,6 +90,7 @@ class _$ItemCopyWithImpl<$Res, $Val extends Item>
     Object? category = null,
     Object? brand = null,
     Object? size = null,
+    Object? shoeSizeEu = freezed,
     Object? condition = null,
     Object? notes = freezed,
     Object? latitude = null,
@@ -119,6 +122,10 @@ class _$ItemCopyWithImpl<$Res, $Val extends Item>
           ? _value.size
           : size // ignore: cast_nullable_to_non_nullable
               as ItemSize,
+      shoeSizeEu: freezed == shoeSizeEu
+          ? _value.shoeSizeEu
+          : shoeSizeEu // ignore: cast_nullable_to_non_nullable
+              as double?,
       condition: null == condition
           ? _value.condition
           : condition // ignore: cast_nullable_to_non_nullable
@@ -186,6 +193,7 @@ abstract class _$$ItemImplCopyWith<$Res> implements $ItemCopyWith<$Res> {
       ItemCategory category,
       String brand,
       ItemSize size,
+      double? shoeSizeEu,
       ItemCondition condition,
       String? notes,
       double latitude,
@@ -217,6 +225,7 @@ class __$$ItemImplCopyWithImpl<$Res>
     Object? category = null,
     Object? brand = null,
     Object? size = null,
+    Object? shoeSizeEu = freezed,
     Object? condition = null,
     Object? notes = freezed,
     Object? latitude = null,
@@ -248,6 +257,10 @@ class __$$ItemImplCopyWithImpl<$Res>
           ? _value.size
           : size // ignore: cast_nullable_to_non_nullable
               as ItemSize,
+      shoeSizeEu: freezed == shoeSizeEu
+          ? _value.shoeSizeEu
+          : shoeSizeEu // ignore: cast_nullable_to_non_nullable
+              as double?,
       condition: null == condition
           ? _value.condition
           : condition // ignore: cast_nullable_to_non_nullable
@@ -297,6 +310,7 @@ class _$ItemImpl implements _Item {
       required this.category,
       required this.brand,
       required this.size,
+      this.shoeSizeEu,
       required this.condition,
       this.notes,
       required this.latitude,
@@ -321,6 +335,8 @@ class _$ItemImpl implements _Item {
   final String brand;
   @override
   final ItemSize size;
+  @override
+  final double? shoeSizeEu;
   @override
   final ItemCondition condition;
   @override
@@ -349,7 +365,7 @@ class _$ItemImpl implements _Item {
 
   @override
   String toString() {
-    return 'Item(id: $id, ownerId: $ownerId, category: $category, brand: $brand, size: $size, condition: $condition, notes: $notes, latitude: $latitude, longitude: $longitude, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, photos: $photos, verification: $verification)';
+    return 'Item(id: $id, ownerId: $ownerId, category: $category, brand: $brand, size: $size, shoeSizeEu: $shoeSizeEu, condition: $condition, notes: $notes, latitude: $latitude, longitude: $longitude, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, photos: $photos, verification: $verification)';
   }
 
   @override
@@ -363,6 +379,8 @@ class _$ItemImpl implements _Item {
                 other.category == category) &&
             (identical(other.brand, brand) || other.brand == brand) &&
             (identical(other.size, size) || other.size == size) &&
+            (identical(other.shoeSizeEu, shoeSizeEu) ||
+                other.shoeSizeEu == shoeSizeEu) &&
             (identical(other.condition, condition) ||
                 other.condition == condition) &&
             (identical(other.notes, notes) || other.notes == notes) &&
@@ -389,6 +407,7 @@ class _$ItemImpl implements _Item {
       category,
       brand,
       size,
+      shoeSizeEu,
       condition,
       notes,
       latitude,
@@ -422,6 +441,7 @@ abstract class _Item implements Item {
       required final ItemCategory category,
       required final String brand,
       required final ItemSize size,
+      final double? shoeSizeEu,
       required final ItemCondition condition,
       final String? notes,
       required final double latitude,
@@ -444,6 +464,8 @@ abstract class _Item implements Item {
   String get brand;
   @override
   ItemSize get size;
+  @override
+  double? get shoeSizeEu;
   @override
   ItemCondition get condition;
   @override

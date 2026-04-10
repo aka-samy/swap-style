@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/models/item.dart';
 import '../providers/profile_provider.dart';
 
 class WishlistScreen extends ConsumerStatefulWidget {
@@ -20,47 +21,75 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
   void _showAddDialog() {
     final brandCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
+    ItemCategory selectedCategory = ItemCategory.shirt;
+    String? selectedSize;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 16, right: 16, top: 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Add to Wishlist',
-                style: Theme.of(ctx).textTheme.titleMedium),
-            const SizedBox(height: 16),
-            TextField(
-              controller: brandCtrl,
-              decoration: const InputDecoration(labelText: 'Brand (optional)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: notesCtrl,
-              decoration: const InputDecoration(labelText: 'Notes (optional)'),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () async {
-                await ref.read(profileProvider.notifier).addWishlistEntry({
-                  'category': 'shirt',
-                  if (brandCtrl.text.trim().isNotEmpty)
-                    'brand': brandCtrl.text.trim(),
-                  if (notesCtrl.text.trim().isNotEmpty)
-                    'notes': notesCtrl.text.trim(),
-                });
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-              child: const Text('Add'),
-            ),
-            const SizedBox(height: 16),
-          ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 20, right: 20, top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Add to Wishlist',
+                  style: Theme.of(ctx).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              DropdownButtonFormField<ItemCategory>(
+                value: selectedCategory,
+                decoration: const InputDecoration(hintText: 'Category'),
+                items: ItemCategory.values
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.apiValue),
+                        ))
+                    .toList(),
+                onChanged: (v) => setSheetState(() => selectedCategory = v!),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedSize,
+                decoration: const InputDecoration(hintText: 'Size (optional)'),
+                items: ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setSheetState(() => selectedSize = v),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: brandCtrl,
+                decoration: const InputDecoration(hintText: 'Brand (optional)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: notesCtrl,
+                decoration: const InputDecoration(hintText: 'Notes (optional)'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () async {
+                  await ref.read(profileProvider.notifier).addWishlistEntry({
+                    'category': selectedCategory.apiValue,
+                    if (selectedSize != null) 'size': selectedSize,
+                    if (brandCtrl.text.trim().isNotEmpty)
+                      'brand': brandCtrl.text.trim(),
+                    if (notesCtrl.text.trim().isNotEmpty)
+                      'notes': notesCtrl.text.trim(),
+                  });
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: const Text('Add'),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

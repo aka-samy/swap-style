@@ -36,4 +36,10 @@ export class NotificationsController {
   async markRead(@Param('id') id: string, @Req() req: any) {
     return this.notificationsService.markRead(id, req.user.userId);
   }
+
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Mark all notifications as read' })
+  async markAllRead(@Req() req: any) {
+    return this.notificationsService.markAllRead(req.user.userId);
+  }
 }

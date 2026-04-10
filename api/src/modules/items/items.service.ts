@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
@@ -21,12 +22,17 @@ export class ItemsService {
   ) {}
 
   async create(userId: string, dto: CreateItemDto) {
+    if (dto.category === 'Shoes' && dto.shoeSizeEu == null) {
+      throw new BadRequestException('shoeSizeEu is required for shoes');
+    }
+
     return this.prisma.item.create({
       data: {
         ownerId: userId,
         category: dto.category,
         brand: dto.brand,
         size: dto.size,
+        shoeSizeEu: dto.category === 'Shoes' ? dto.shoeSizeEu ?? null : null,
         condition: dto.condition,
         notes: dto.notes,
         latitude: dto.latitude,
@@ -73,9 +79,19 @@ export class ItemsService {
       throw new ForbiddenException('You can only edit your own items');
     }
 
+    const nextCategory = dto.category ?? item.category;
+    const nextShoeSize =
+      dto.shoeSizeEu !== undefined ? dto.shoeSizeEu : (item as any).shoeSizeEu;
+    if (nextCategory === 'Shoes' && nextShoeSize == null) {
+      throw new BadRequestException('shoeSizeEu is required for shoes');
+    }
+
     return this.prisma.item.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        shoeSizeEu: nextCategory === 'Shoes' ? nextShoeSize : null,
+      },
       include: ITEM_INCLUDE,
     });
   }

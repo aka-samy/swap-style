@@ -13,6 +13,7 @@ class DiscoveryRepository {
     double radiusKm = 50,
     String? size,
     String? category,
+    double? shoeSizeEu,
   }) async {
     final response = await _client.dio.get('/discovery/feed', queryParameters: {
       'latitude': latitude,
@@ -22,6 +23,7 @@ class DiscoveryRepository {
       'radiusKm': radiusKm,
       if (size != null) 'size': size,
       if (category != null) 'category': category,
+      if (shoeSizeEu != null) 'shoeSizeEu': shoeSizeEu,
     });
     return FeedResult.fromJson(response.data);
   }
@@ -47,6 +49,7 @@ class FeedItem {
   final String category;
   final String brand;
   final String size;
+  final double? shoeSizeEu;
   final String condition;
   final bool isVerified;
   final double distanceKm;
@@ -61,6 +64,7 @@ class FeedItem {
     required this.category,
     required this.brand,
     required this.size,
+    this.shoeSizeEu,
     required this.condition,
     required this.isVerified,
     required this.distanceKm,
@@ -77,6 +81,7 @@ class FeedItem {
       category: json['category'],
       brand: json['brand'],
       size: json['size'],
+      shoeSizeEu: (json['shoeSizeEu'] as num?)?.toDouble(),
       condition: json['condition'],
       isVerified: json['isVerified'] ?? false,
       distanceKm: (json['distanceKm'] as num).toDouble(),

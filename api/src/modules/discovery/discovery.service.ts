@@ -22,12 +22,25 @@ export class DiscoveryService {
     userId: string,
     query: FeedQueryDto,
   ) {
-    const { page = 1, limit = 20, latitude, longitude, radiusKm = 50, size, category } = query;
+    if (!userId) {
+      throw new BadRequestException('User account is not fully set up');
+    }
+
+    const {
+      page = 1,
+      limit = 20,
+      latitude,
+      longitude,
+      radiusKm = 50,
+      size,
+      category,
+      shoeSizeEu,
+    } = query;
     const offset = (page - 1) * limit;
     const radiusMeters = radiusKm * 1000;
 
     // Redis cache key based on user + query parameters
-    const cacheKey = `feed:${userId}:${latitude}:${longitude}:${radiusKm}:${size ?? ''}:${category ?? ''}:${page}`;
+    const cacheKey = `feed:${userId}:${latitude}:${longitude}:${radiusKm}:${size ?? ''}:${category ?? ''}:${shoeSizeEu ?? ''}:${page}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached) as object;
@@ -36,11 +49,15 @@ export class DiscoveryService {
     // Build filter clauses
     const sizeFilter = size ? Prisma.sql`AND i."size"::text = ${size}` : Prisma.empty;
     const categoryFilter = category ? Prisma.sql`AND i."category"::text = ${category}` : Prisma.empty;
+    const shoeSizeFilter = shoeSizeEu
+      ? Prisma.sql`AND i."category" = 'Shoes' AND i."shoe_size_eu" = ${shoeSizeEu}`
+      : Prisma.empty;
 
     // PostGIS distance-based feed query
     const items = await this.prisma.$queryRaw<any[]>`
       SELECT
         i.id, i."owner_id" AS "ownerId", i.category, i.brand, i.size, i.condition,
+        i."shoe_size_eu" AS "shoeSizeEu",
         i.latitude, i.longitude, i.status,
         u."name" AS "ownerName",
         u."profile_photo_url" AS "ownerPhotoUrl",
@@ -70,6 +87,7 @@ export class DiscoveryService {
         )
         ${sizeFilter}
         ${categoryFilter}
+        ${shoeSizeFilter}
       ORDER BY "distanceKm" ASC
       LIMIT ${limit} OFFSET ${offset}
     `;
@@ -83,12 +101,41 @@ export class DiscoveryService {
         })
       : [];
 
+    const verifications = itemIds.length
+      ? await this.prisma.itemVerification.findMany({
+          where: { itemId: { in: itemIds } },
+          select: {
+            itemId: true,
+            verifiedAt: true,
+            washed: true,
+            noStains: true,
+            noTears: true,
+            noDefects: true,
+            photosAccurate: true,
+          },
+        })
+      : [];
+
     const photosByItem = photos.reduce(
       (acc, p) => {
         (acc[p.itemId] ||= []).push({ url: p.url, thumbnailUrl: p.url });
         return acc;
       },
       {} as Record<string, any[]>,
+    );
+
+    const verifiedItemIds = new Set(
+      verifications
+        .filter(
+          (v) =>
+            !!v.verifiedAt &&
+            v.washed &&
+            v.noStains &&
+            v.noTears &&
+            v.noDefects &&
+            v.photosAccurate,
+        )
+        .map((v) => v.itemId),
     );
 
     const result = {
@@ -100,9 +147,13 @@ export class DiscoveryService {
         ownerVerified: item.ownerVerified,
         category: item.category,
         brand: item.brand,
-        size: item.size,
+        size:
+          item.category === 'Shoes' && item.shoeSizeEu != null
+            ? `EU ${item.shoeSizeEu}`
+            : item.size,
         condition: item.condition,
-        isVerified: false,
+        shoeSizeEu: item.shoeSizeEu,
+        isVerified: verifiedItemIds.has(item.id),
         distanceKm: Math.round(item.distanceKm * 10) / 10,
         photos: photosByItem[item.id] || [],
       })),

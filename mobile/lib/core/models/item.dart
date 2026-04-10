@@ -22,6 +22,29 @@ enum ItemCategory {
   other,
 }
 
+extension ItemCategoryX on ItemCategory {
+  String get apiValue {
+    switch (this) {
+      case ItemCategory.shirt:
+        return 'Shirt';
+      case ItemCategory.hoodie:
+        return 'Hoodie';
+      case ItemCategory.pants:
+        return 'Pants';
+      case ItemCategory.shoes:
+        return 'Shoes';
+      case ItemCategory.jacket:
+        return 'Jacket';
+      case ItemCategory.dress:
+        return 'Dress';
+      case ItemCategory.accessories:
+        return 'Accessories';
+      case ItemCategory.other:
+        return 'Other';
+    }
+  }
+}
+
 enum ItemSize {
   @JsonValue('XS')
   xs,
@@ -39,6 +62,31 @@ enum ItemSize {
   oneSize,
 }
 
+extension ItemSizeX on ItemSize {
+  String get apiValue {
+    switch (this) {
+      case ItemSize.xs:
+        return 'XS';
+      case ItemSize.s:
+        return 'S';
+      case ItemSize.m:
+        return 'M';
+      case ItemSize.l:
+        return 'L';
+      case ItemSize.xl:
+        return 'XL';
+      case ItemSize.xxl:
+        return 'XXL';
+      case ItemSize.oneSize:
+        return 'ONE_SIZE';
+    }
+  }
+
+  String get label {
+    return this == ItemSize.oneSize ? 'ONE SIZE' : apiValue;
+  }
+}
+
 enum ItemCondition {
   @JsonValue('New')
   newItem,
@@ -48,6 +96,21 @@ enum ItemCondition {
   good,
   @JsonValue('Fair')
   fair,
+}
+
+extension ItemConditionX on ItemCondition {
+  String get apiValue {
+    switch (this) {
+      case ItemCondition.newItem:
+        return 'New';
+      case ItemCondition.likeNew:
+        return 'LikeNew';
+      case ItemCondition.good:
+        return 'Good';
+      case ItemCondition.fair:
+        return 'Fair';
+    }
+  }
 }
 
 enum ItemStatus { available, swapped, removed }
@@ -60,6 +123,7 @@ class Item with _$Item {
     required ItemCategory category,
     required String brand,
     required ItemSize size,
+    double? shoeSizeEu,
     required ItemCondition condition,
     String? notes,
     required double latitude,

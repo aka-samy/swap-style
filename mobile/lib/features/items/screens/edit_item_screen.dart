@@ -29,12 +29,30 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
   ItemCategory? _category;
   ItemSize? _size;
+  double _shoeSizeEu = 42;
   ItemCondition? _condition;
   bool _isSubmitting = false;
   bool _initialized = false;
   final List<File> _newPhotos = [];
   List<String> _existingPhotoUrls = [];
   final _picker = ImagePicker();
+
+  static const List<double> _shoeSizesEu = [
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+  ];
 
   @override
   void initState() {
@@ -50,6 +68,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
     _notesController.text = item.notes ?? '';
     _category = item.category;
     _size = item.size;
+    _shoeSizeEu = item.shoeSizeEu ?? 42;
     _condition = item.condition;
     _existingPhotoUrls = item.photos.map((p) => p.url).toList();
   }
@@ -68,10 +87,13 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
     final success = await ref.read(itemsProvider.notifier).updateItem(
       widget.itemId,
       {
-        'category': _category?.name,
+        'category': _category?.apiValue,
         'brand': _brandController.text.trim(),
-        'size': _size?.name,
-        'condition': _condition?.name,
+        'size': _category == ItemCategory.shoes
+            ? ItemSize.oneSize.apiValue
+            : _size?.apiValue,
+        'shoeSizeEu': _category == ItemCategory.shoes ? _shoeSizeEu : null,
+        'condition': _condition?.apiValue,
         'notes': _notesController.text.trim(),
       },
     );
@@ -300,10 +322,20 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
               items: ItemCategory.values
                   .map((c) => DropdownMenuItem(
                         value: c,
-                        child: Text(c.name.toUpperCase()),
+                        child: Text(c.apiValue),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _category = v),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  _category = v;
+                  if (_category == ItemCategory.shoes) {
+                    _size = ItemSize.oneSize;
+                  } else if (_size == ItemSize.oneSize) {
+                    _size = ItemSize.m;
+                  }
+                });
+              },
             ),
             const SizedBox(height: 16),
 
@@ -315,17 +347,34 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
             ),
             const SizedBox(height: 16),
 
-            DropdownButtonFormField<ItemSize>(
-              value: _size,
-              decoration: const InputDecoration(labelText: 'Size'),
-              items: ItemSize.values
-                  .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.name.toUpperCase()),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _size = v),
-            ),
+            if (_category == ItemCategory.shoes)
+              DropdownButtonFormField<double>(
+                value: _shoeSizeEu,
+                decoration: const InputDecoration(labelText: 'Shoe Size (EU)'),
+                items: _shoeSizesEu
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.toStringAsFixed(0)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _shoeSizeEu = v);
+                },
+              )
+            else
+              DropdownButtonFormField<ItemSize>(
+                value: _size,
+                decoration: const InputDecoration(labelText: 'Size'),
+                items: ItemSize.values
+                    .where((s) => s != ItemSize.oneSize)
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.label),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _size = v),
+              ),
             const SizedBox(height: 16),
 
             DropdownButtonFormField<ItemCondition>(
@@ -334,7 +383,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
               items: ItemCondition.values
                   .map((c) => DropdownMenuItem(
                         value: c,
-                        child: Text(c.name),
+                        child: Text(c.apiValue),
                       ))
                   .toList(),
               onChanged: (v) => setState(() => _condition = v),

@@ -22,9 +22,27 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
 
   ItemCategory _category = ItemCategory.shirt;
   ItemSize _size = ItemSize.m;
+  double _shoeSizeEu = 42;
   ItemCondition _condition = ItemCondition.good;
   bool _isSubmitting = false;
   final List<File> _photos = [];
+
+  static const List<double> _shoeSizesEu = [
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+  ];
 
   @override
   void dispose() {
@@ -88,10 +106,13 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     final location = await ref.read(currentLocationProvider.future);
 
     final item = await ref.read(itemsProvider.notifier).createItem(
-          category: _category.name,
+        category: _category.apiValue,
           brand: _brandController.text.trim(),
-          size: _size.name,
-          condition: _condition.name,
+        size: _category == ItemCategory.shoes
+          ? ItemSize.oneSize.apiValue
+          : _size.apiValue,
+        shoeSizeEu: _category == ItemCategory.shoes ? _shoeSizeEu : null,
+        condition: _condition.apiValue,
           notes: _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),
@@ -210,10 +231,20 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
               items: ItemCategory.values
                   .map((c) => DropdownMenuItem(
                         value: c,
-                        child: Text(c.name.toUpperCase()),
+                        child: Text(c.apiValue),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _category = v!),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  _category = v;
+                  if (_category == ItemCategory.shoes) {
+                    _size = ItemSize.oneSize;
+                  } else if (_size == ItemSize.oneSize) {
+                    _size = ItemSize.m;
+                  }
+                });
+              },
             ),
             const SizedBox(height: 16),
 
@@ -227,17 +258,37 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
             const SizedBox(height: 16),
 
             // Size
-            DropdownButtonFormField<ItemSize>(
-              value: _size,
-              decoration: const InputDecoration(labelText: 'Size'),
-              items: ItemSize.values
-                  .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.name.toUpperCase()),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _size = v!),
-            ),
+            if (_category == ItemCategory.shoes)
+              DropdownButtonFormField<double>(
+                value: _shoeSizeEu,
+                decoration: const InputDecoration(labelText: 'Shoe Size (EU)'),
+                items: _shoeSizesEu
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.toStringAsFixed(0)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _shoeSizeEu = v);
+                },
+              )
+            else
+              DropdownButtonFormField<ItemSize>(
+                value: _size,
+                decoration: const InputDecoration(labelText: 'Size'),
+                items: ItemSize.values
+                    .where((s) => s != ItemSize.oneSize)
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.label),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _size = v);
+                },
+              ),
             const SizedBox(height: 16),
 
             // Condition
@@ -247,10 +298,13 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
               items: ItemCondition.values
                   .map((c) => DropdownMenuItem(
                         value: c,
-                        child: Text(c.name),
+                        child: Text(c.apiValue),
                       ))
                   .toList(),
-              onChanged: (v) => setState(() => _condition = v!),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _condition = v);
+              },
             ),
             const SizedBox(height: 16),
 

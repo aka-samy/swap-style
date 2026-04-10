@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/user.dart';
 
@@ -19,6 +21,35 @@ class ProfileRepository {
   Future<User> getPublicProfile(String userId) async {
     final response = await _client.dio.get('/users/$userId');
     return User.fromJson(response.data);
+  }
+
+  Future<String> uploadProfilePhoto(String filePath) async {
+    // 1. Get presigned upload URL
+    final file = File(filePath);
+    final contentType = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    final presignResponse = await _client.dio.post(
+      '/users/me/profile-photo',
+      data: {'contentType': contentType},
+    );
+    final uploadUrl = presignResponse.data['uploadUrl'] as String;
+    final publicUrl = presignResponse.data['publicUrl'] as String;
+
+    // 2. Upload file to presigned URL
+    final bytes = await file.readAsBytes();
+    await Dio().put(
+      uploadUrl,
+      data: bytes,
+      options: Options(
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': bytes.length,
+        },
+      ),
+    );
+
+    // 3. Update profile with new photo URL
+    await _client.dio.patch('/users/me', data: {'profilePhotoUrl': publicUrl});
+    return publicUrl;
   }
 
   Future<List<WishlistEntry>> getWishlist() async {

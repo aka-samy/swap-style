@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_error_mapper.dart';
 import '../../../core/models/user.dart';
 import '../data/profile_repository.dart';
 
@@ -42,18 +44,49 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       final user = await _repository.getMyProfile();
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        isLoading: false,
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not load profile',
+        ),
+      );
     }
   }
 
   Future<bool> updateProfile(Map<String, dynamic> data) async {
     try {
       final updated = await _repository.updateProfile(data);
-      state = state.copyWith(user: updated);
+      // Preserve existing stats since PATCH response doesn't include them
+      final merged = updated.copyWith(stats: state.user?.stats);
+      state = state.copyWith(user: merged);
       return true;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not update profile',
+        ),
+      );
       return false;
+    }
+  }
+
+  Future<String?> uploadProfilePhoto(String filePath) async {
+    try {
+      final result = await _repository.uploadProfilePhoto(filePath);
+      return result;
+    } catch (e) {
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not upload profile photo',
+        ),
+      );
+      return null;
     }
   }
 
@@ -62,7 +95,13 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       final wishlist = await _repository.getWishlist();
       state = state.copyWith(wishlist: wishlist);
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not load wishlist',
+        ),
+      );
     }
   }
 
@@ -72,7 +111,13 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       state = state.copyWith(wishlist: [...state.wishlist, entry]);
       return true;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not add wishlist item',
+        ),
+      );
       return false;
     }
   }
@@ -85,7 +130,13 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       );
       return true;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not remove wishlist item',
+        ),
+      );
       return false;
     }
   }

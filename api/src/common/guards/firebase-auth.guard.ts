@@ -29,14 +29,32 @@ export class FirebaseAuthGuard implements CanActivate {
         where: { firebaseUid: decodedToken.uid },
       });
 
+      if (!dbUser) {
+        throw new UnauthorizedException(
+          'Account does not exist. Please register first.',
+        );
+      }
+
+      const dbUserAny = dbUser as any;
+      if (
+        dbUserAny.suspendedUntil &&
+        new Date(dbUserAny.suspendedUntil).getTime() > Date.now()
+      ) {
+        throw new UnauthorizedException('Account is temporarily suspended');
+      }
+
       request.user = {
         uid: decodedToken.uid,
-        userId: dbUser?.id,
+        userId: dbUser.id,
         email: decodedToken.email,
         emailVerified: decodedToken.email_verified,
+        role: dbUserAny.role ?? 'USER',
       };
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid or expired token');
     }
   }

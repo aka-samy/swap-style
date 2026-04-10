@@ -9,7 +9,9 @@ describe('NotificationsService', () => {
     notification: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       count: jest.fn(),
     },
     user: { findUnique: jest.fn() },
@@ -84,6 +86,10 @@ describe('NotificationsService', () => {
 
   describe('markRead', () => {
     it('should mark notification as read', async () => {
+      mockPrisma.notification.findUnique.mockResolvedValue({
+        id: 'n1',
+        userId: 'user-1',
+      });
       mockPrisma.notification.update.mockResolvedValue({
         id: 'n1',
         readAt: expect.any(Date),

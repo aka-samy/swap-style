@@ -7,37 +7,52 @@ import '../providers/auth_provider.dart';
 // Auth screens
 import '../../features/auth/screens/sign_in_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
+import '../../features/auth/screens/phone_verify_screen.dart';
+import '../../features/auth/screens/splash_screen.dart';
 
 // Main tab screens
 import '../../features/discovery/screens/discovery_screen.dart';
 import '../../features/matching/screens/match_list_screen.dart';
 import '../../features/items/screens/closet_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 
 // Detail screens
 import '../../features/items/screens/add_item_screen.dart';
 import '../../features/items/screens/edit_item_screen.dart';
 import '../../features/matching/screens/match_detail_screen.dart';
 import '../../features/chat/screens/conversation_screen.dart';
+import '../../features/chat/screens/chat_list_screen.dart';
 import '../../features/profile/screens/public_profile_screen.dart';
 import '../../features/profile/screens/wishlist_screen.dart';
 import '../../features/gamification/screens/gamification_screen.dart';
+import '../../features/admin/screens/admin_panel_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    initialLocation: '/discover',
+    initialLocation: '/splash',
     redirect: (context, state) {
       final isAuth = authState.status == AuthStatus.authenticated;
+      final isBooting = authState.status == AuthStatus.initial;
       final isAuthRoute = state.matchedLocation == '/sign-in' ||
           state.matchedLocation == '/register';
+      final isSplashRoute = state.matchedLocation == '/splash';
+      final isAdminRoute = state.matchedLocation.startsWith('/admin');
+
+      if (isBooting) return isSplashRoute ? null : '/splash';
 
       if (!isAuth && !isAuthRoute) return '/sign-in';
-      if (isAuth && isAuthRoute) return '/discover';
+      if (isAuth && (isAuthRoute || isSplashRoute)) return '/discover';
+      if (isAdminRoute && !authState.isAdmin) return '/discover';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       // Auth routes
       GoRoute(
         path: '/sign-in',
@@ -46,6 +61,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/phone-verify',
+        builder: (context, state) => const PhoneVerifyScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminPanelScreen(),
       ),
 
       // Main app with bottom nav
@@ -115,6 +138,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/notifications',
+                builder: (context, state) => const NotificationsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
                 routes: [
@@ -132,6 +163,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => PublicProfileScreen(
                       userId: state.pathParameters['userId']!,
                     ),
+                  ),
+                  GoRoute(
+                    path: 'chats',
+                    builder: (context, state) => const ChatListScreen(),
                   ),
                 ],
               ),
@@ -175,6 +210,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
             icon: Icon(Icons.checkroom_outlined),
             selectedIcon: Icon(Icons.checkroom),
             label: 'Closet',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications),
+            label: 'Alerts',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

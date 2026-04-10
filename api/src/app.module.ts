@@ -15,6 +15,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { RatingsModule } from './modules/ratings/ratings.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ModerationModule } from './modules/moderation/moderation.module';
     RatingsModule,
     GamificationModule,
     ModerationModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

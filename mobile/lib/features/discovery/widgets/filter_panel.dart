@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/filter_provider.dart';
+import '../../../core/models/item.dart';
 
 class FilterPanel extends ConsumerWidget {
   final VoidCallback onApply;
@@ -12,6 +13,7 @@ class FilterPanel extends ConsumerWidget {
     final filter = ref.watch(filterProvider);
     final notifier = ref.read(filterProvider.notifier);
     final theme = Theme.of(context);
+    const shoeSizesEu = [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48];
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -36,19 +38,41 @@ class FilterPanel extends ConsumerWidget {
           const SizedBox(height: 8),
 
           // Size filter
-          Text('Size', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL'].map((s) {
-              final selected = filter.size == s.toLowerCase();
-              return ChoiceChip(
-                label: Text(s),
-                selected: selected,
-                onSelected: (_) => notifier.setSize(selected ? null : s.toLowerCase()),
-              );
-            }).toList(),
+          Text(
+            filter.category == 'Shoes' ? 'Shoe Size (EU)' : 'Size',
+            style: theme.textTheme.titleSmall,
           ),
+          const SizedBox(height: 8),
+          if (filter.category == 'Shoes')
+            Wrap(
+              spacing: 8,
+              children: shoeSizesEu.map((s) {
+                final selected = filter.shoeSizeEu == s.toDouble();
+                return ChoiceChip(
+                  label: Text('$s'),
+                  selected: selected,
+                  onSelected: (_) => notifier.setShoeSizeEu(
+                    selected ? null : s.toDouble(),
+                  ),
+                );
+              }).toList(),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              children: ItemSize.values
+                  .map((size) => size.apiValue)
+                  .toList()
+                  .map((size) {
+                final selected = filter.size == size;
+                final label = size == 'ONE_SIZE' ? 'ONE SIZE' : size;
+                return ChoiceChip(
+                  label: Text(label),
+                  selected: selected,
+                  onSelected: (_) => notifier.setSize(selected ? null : size),
+                );
+              }).toList(),
+            ),
           const SizedBox(height: 16),
 
           // Category filter
@@ -56,15 +80,19 @@ class FilterPanel extends ConsumerWidget {
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: [
-              'tops', 'bottoms', 'dresses', 'outerwear',
-              'shoes', 'accessories', 'activewear', 'formal',
-            ].map((c) {
-              final selected = filter.category == c;
+            children: ItemCategory.values.map((c) {
+              final category = c.apiValue;
+              final selected = filter.category == category;
               return ChoiceChip(
-                label: Text(c[0].toUpperCase() + c.substring(1)),
+                label: Text(category),
                 selected: selected,
-                onSelected: (_) => notifier.setCategory(selected ? null : c),
+                onSelected: (_) {
+                  final newCategory = selected ? null : category;
+                  notifier.setCategory(newCategory);
+                  if (newCategory == 'Shoes') {
+                    notifier.setSize(null);
+                  }
+                },
               );
             }).toList(),
           ),

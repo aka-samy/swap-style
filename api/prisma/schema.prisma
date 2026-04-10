@@ -87,6 +87,11 @@ enum BadgeCriteriaType {
   rating_count
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 // ─── Models ─────────────────────────────────────────────
 
 model User {
@@ -104,6 +109,8 @@ model User {
   firebaseUid      String   @unique @map("firebase_uid")
   fcmToken         String?  @map("fcm_token")
   timezone         String   @default("UTC")
+  role             UserRole @default(USER)
+  suspendedUntil   DateTime? @map("suspended_until")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -134,6 +141,7 @@ model Item {
   category  ItemCategory
   brand     String
   size      ItemSize
+  shoeSizeEu Float?       @map("shoe_size_eu")
   condition ItemCondition
   notes     String?
   status    ItemStatus    @default(available)
@@ -154,6 +162,7 @@ model Item {
 
   @@index([ownerId, status])
   @@index([size, category, status])
+  @@index([category, shoeSizeEu, status])
   @@map("items")
 }
 

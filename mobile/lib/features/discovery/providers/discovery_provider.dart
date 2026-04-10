@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_error_mapper.dart';
 import '../data/discovery_repository.dart';
 
 class DiscoveryState {
@@ -45,6 +47,7 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
     double radiusKm = 50,
     String? size,
     String? category,
+    double? shoeSizeEu,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -55,6 +58,7 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
         radiusKm: radiusKm,
         size: size,
         category: category,
+        shoeSizeEu: shoeSizeEu,
       );
       state = state.copyWith(
         cards: result.data,
@@ -63,7 +67,14 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
         currentPage: 1,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        isLoading: false,
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not load discovery feed',
+        ),
+      );
     }
   }
 
@@ -73,6 +84,7 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
     double radiusKm = 50,
     String? size,
     String? category,
+    double? shoeSizeEu,
   }) async {
     if (!state.hasMore || state.isLoading) return;
 
@@ -86,6 +98,7 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
         radiusKm: radiusKm,
         size: size,
         category: category,
+        shoeSizeEu: shoeSizeEu,
       );
       state = state.copyWith(
         cards: [...state.cards, ...result.data],
@@ -94,7 +107,14 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
         currentPage: nextPage,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        isLoading: false,
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not load more items',
+        ),
+      );
     }
   }
 
@@ -107,9 +127,20 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
       );
       return result;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      debugPrint(ApiErrorMapper.toDebugMessage(e));
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not send your swipe. Please try again.',
+        ),
+      );
       return null;
     }
+  }
+
+  /// Re-insert a card at the front (visual undo only)
+  void undoSwipe(FeedItem item) {
+    state = state.copyWith(cards: [item, ...state.cards]);
   }
 }
 

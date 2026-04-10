@@ -14,6 +14,12 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(500)
   bio?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  profilePhotoUrl?: string;
 }
 
 export class CreateWishlistEntryDto {

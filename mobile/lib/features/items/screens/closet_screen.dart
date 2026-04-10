@@ -26,45 +26,78 @@ class _ClosetScreenState extends ConsumerState<ClosetScreen> {
     final isLoading = state.isLoading;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Closet'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => context.go('/closet/add'),
-          ),
-        ],
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+              child: Row(
+                children: [
+                  Text('My Closet',
+                      style: theme.textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: () => context.go('/closet/add'),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: isLoading && items.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : items.isEmpty
+                      ? _buildEmptyState(theme)
+                      : _buildItemGrid(items, theme),
+            ),
+          ],
+        ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : items.isEmpty
-              ? _buildEmptyState(theme)
-              : _buildItemGrid(items, theme),
     );
   }
 
   Widget _buildEmptyState(ThemeData theme) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.checkroom,
-              size: 64, color: theme.colorScheme.primary.withAlpha(128)),
-          const SizedBox(height: 16),
-          Text('Your closet is empty',
-              style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text('Add an item to start swapping!',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              )),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: () => context.go('/closet/add'),
-            icon: const Icon(Icons.add),
-            label: const Text('Add Item'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withAlpha(20),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.checkroom_rounded,
+                  size: 40, color: theme.colorScheme.primary.withAlpha(120)),
+            ),
+            const SizedBox(height: 20),
+            Text('Your closet is empty',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('Add an item to start swapping!',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                )),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => context.go('/closet/add'),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Item'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -102,8 +135,12 @@ class _ItemCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Card(
+      child: Container(
         clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: theme.colorScheme.surfaceContainerHighest,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -115,11 +152,18 @@ class _ItemCard extends StatelessWidget {
                         item.photos.first.url,
                         fit: BoxFit.cover,
                         width: double.infinity,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Icon(Icons.checkroom_rounded,
+                              size: 40,
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withAlpha(100)),
+                        ),
                       )
                     : Center(
-                        child: Icon(Icons.image,
-                            size: 48,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        child: Icon(Icons.checkroom_rounded,
+                            size: 40,
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withAlpha(100)),
                       ),
               ),
             ),

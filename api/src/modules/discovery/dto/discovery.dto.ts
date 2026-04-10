@@ -1,6 +1,7 @@
 import { IsString, IsEnum, IsOptional, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { ItemCategory, ItemSize } from '@prisma/client';
 
 export class FeedQueryDto {
   @ApiPropertyOptional({ default: 1 })
@@ -37,13 +38,21 @@ export class FeedQueryDto {
 
   @ApiPropertyOptional({ description: 'Filter by size' })
   @IsOptional()
-  @IsString()
-  size?: string;
+  @IsEnum(ItemSize)
+  size?: ItemSize;
 
   @ApiPropertyOptional({ description: 'Filter by category' })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsEnum(ItemCategory)
+  category?: ItemCategory;
+
+  @ApiPropertyOptional({ description: 'Filter by EU shoe size', example: 42 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(30)
+  @Max(55)
+  shoeSizeEu?: number;
 }
 
 export class SwipeDto {

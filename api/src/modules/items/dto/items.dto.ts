@@ -3,6 +3,8 @@ import {
   IsEnum,
   IsOptional,
   IsNumber,
+  Min,
+  Max,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -23,6 +25,13 @@ export class CreateItemDto {
   @ApiProperty({ enum: ItemSize })
   @IsEnum(ItemSize)
   size: ItemSize;
+
+  @ApiPropertyOptional({ description: 'EU shoe size (required for shoes)', example: 42 })
+  @IsOptional()
+  @IsNumber()
+  @Min(30)
+  @Max(55)
+  shoeSizeEu?: number;
 
   @ApiProperty({ enum: ItemCondition })
   @IsEnum(ItemCondition)

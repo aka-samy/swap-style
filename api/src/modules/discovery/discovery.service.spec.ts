@@ -9,6 +9,7 @@ describe('DiscoveryService', () => {
   const mockPrisma = {
     item: { findMany: jest.fn(), findUnique: jest.fn().mockResolvedValue({ id: 'item-1', ownerId: 'user-2' }) },
     itemPhoto: { findMany: jest.fn().mockResolvedValue([]) },
+    itemVerification: { findMany: jest.fn().mockResolvedValue([]) },
     like: { findFirst: jest.fn(), create: jest.fn() },
     block: { findMany: jest.fn() },
     match: { create: jest.fn() },
@@ -38,19 +39,16 @@ describe('DiscoveryService', () => {
           id: 'item-1',
           ownerId: 'other-user',
           brand: 'Nike',
-          category: 'tops',
-          size: 'm',
-          condition: 'good',
+          category: 'Shirt',
+          size: 'M',
+          condition: 'Good',
+          shoeSizeEu: null,
           latitude: 30.05,
           longitude: 31.25,
-          photos: [{ url: 'https://example.com/photo.jpg', sortOrder: 0 }],
-          owner: {
-            id: 'other-user',
-            displayName: 'Jane',
-            profilePhotoUrl: null,
-            emailVerified: true,
-          },
-          distance_km: 3.2,
+          ownerName: 'Jane',
+          ownerPhotoUrl: null,
+          ownerVerified: true,
+          distanceKm: 3.2,
         },
       ];
       mockPrisma.$queryRaw.mockResolvedValue(mockItems);
@@ -143,8 +141,8 @@ describe('DiscoveryService', () => {
         latitude: 30.0,
         longitude: 31.2,
         radiusKm: 15,
-        size: 'm',
-        category: 'tops',
+        size: 'M',
+        category: 'Shirt',
       });
 
       expect(mockPrisma.$queryRaw).toHaveBeenCalled();

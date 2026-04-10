@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
 import * as admin from 'firebase-admin';
@@ -83,9 +88,32 @@ export class NotificationsService {
   }
 
   async markRead(notificationId: string, userId: string) {
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: notificationId },
+      select: { id: true, userId: true },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+    if (notification.userId !== userId) {
+      throw new ForbiddenException(
+        'You cannot mark another user notifications as read',
+      );
+    }
+
     return this.prisma.notification.update({
       where: { id: notificationId },
       data: { readAt: new Date() },
     });
+  }
+
+  async markAllRead(userId: string) {
+    const updated = await this.prisma.notification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+
+    return { updated: updated.count };
   }
 }
