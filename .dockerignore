@@ -1,0 +1,13 @@
+.git
+.github
+.vscode
+.specify
+old
+mobile
+node_modules
+**/node_modules
+api/node_modules
+api/.env
+api/firebase-service-account.json
+api/*service-account*.json
+*.log

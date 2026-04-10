@@ -30,6 +30,8 @@ if [ -z "$REDIS_URL" ]; then
     export REDIS_URL="$REDIS_PRIVATE_URL"
   elif [ -n "$REDIS_PUBLIC_URL" ]; then
     export REDIS_URL="$REDIS_PUBLIC_URL"
+  elif [ -n "$REDISURL" ]; then
+    export REDIS_URL="$REDISURL"
   fi
 fi
 
@@ -42,6 +44,14 @@ if [ -z "$DATABASE_URL" ]; then
   echo "ERROR: DATABASE_URL environment variable is not set!"
   echo "Please set DATABASE_URL in your Railway service variables."
   exit 1
+fi
+
+if [ "$NODE_ENV" = "production" ]; then
+  if [ -z "$REDIS_URL" ] && [ -z "$REDIS_HOST" ] && [ -z "$REDISHOST" ]; then
+    echo "ERROR: Redis is not configured in production."
+    echo "Please set REDIS_URL (or REDIS_PRIVATE_URL) in your Railway service variables."
+    exit 1
+  fi
 fi
 
 echo "Running prisma migrate deploy..."

@@ -22,15 +22,17 @@ function parseRedisUrl(redisUrl: string) {
     {
       provide: REDIS_CLIENT,
       useFactory: (configService: ConfigService) => {
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
         const redisUrl =
           configService.get<string>('REDIS_URL') ||
+          configService.get<string>('REDISURL') ||
           configService.get<string>('REDIS_PRIVATE_URL') ||
           configService.get<string>('REDIS_PUBLIC_URL');
 
         const options = redisUrl
           ? parseRedisUrl(redisUrl)
           : {
-              host: configService.get<string>('REDIS_HOST', 'localhost'),
+              host: configService.get<string>('REDIS_HOST') || undefined,
               port:
                 configService.get<number>('REDIS_PORT') ||
                 Number(configService.get<string>('REDISPORT')) ||
@@ -46,16 +48,34 @@ function parseRedisUrl(redisUrl: string) {
                 undefined,
             };
 
+        if (!redisUrl && !options.host) {
+          options.host =
+            configService.get<string>('REDISHOST') ||
+            (isProduction ? undefined : 'localhost');
+        }
+
         if (!redisUrl && options.host === 'localhost') {
           options.host =
             configService.get<string>('REDISHOST') ||
             configService.get<string>('REDIS_HOST', 'localhost');
         }
 
-        return new Redis({
+        if (isProduction && !redisUrl && (!options.host || options.host === 'localhost')) {
+          throw new Error(
+            'Redis is not configured for production. Set REDIS_URL (or REDIS_PRIVATE_URL) in Railway variables.',
+          );
+        }
+
+        const client = new Redis({
           ...options,
           maxRetriesPerRequest: 3,
         });
+
+        client.on('error', (error) => {
+          console.error('Redis connection error:', error.message);
+        });
+
+        return client;
       },
       inject: [ConfigService],
     },
