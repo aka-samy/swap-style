@@ -25,7 +25,16 @@ elif echo "$DATABASE_URL" | grep -Eq 'localhost|127\.0\.0\.1'; then
     echo "Switched DATABASE_URL to POSTGRES_URL"
   fi
 fi
+if [ -z "$REDIS_URL" ]; then
+  if [ -n "$REDIS_PRIVATE_URL" ]; then
+    export REDIS_URL="$REDIS_PRIVATE_URL"
+  elif [ -n "$REDIS_PUBLIC_URL" ]; then
+    export REDIS_URL="$REDIS_PUBLIC_URL"
+  fi
+fi
+
 echo "DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo 'YES' || echo 'NO')"
+echo "REDIS_URL is set: $([ -n "$REDIS_URL" ] && echo 'YES' || echo 'NO')"
 echo "REDIS_HOST: $REDIS_HOST"
 echo "==========================="
 

@@ -31,14 +31,26 @@ function parseRedisUrl(redisUrl: string) {
           ? parseRedisUrl(redisUrl)
           : {
               host: configService.get<string>('REDIS_HOST', 'localhost'),
-              port: configService.get<number>('REDIS_PORT', 6379),
+              port:
+                configService.get<number>('REDIS_PORT') ||
+                Number(configService.get<string>('REDISPORT')) ||
+                6379,
               username:
                 configService.get<string>('REDIS_USERNAME') ||
+                configService.get<string>('REDISUSER') ||
                 configService.get<string>('REDIS_USER') ||
                 undefined,
               password:
-                configService.get<string>('REDIS_PASSWORD') || undefined,
+                configService.get<string>('REDIS_PASSWORD') ||
+                configService.get<string>('REDISPASSWORD') ||
+                undefined,
             };
+
+        if (!redisUrl && options.host === 'localhost') {
+          options.host =
+            configService.get<string>('REDISHOST') ||
+            configService.get<string>('REDIS_HOST', 'localhost');
+        }
 
         return new Redis({
           ...options,
