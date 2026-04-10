@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RegisterDto, UpdateFcmTokenDto } from './dto';
@@ -9,17 +9,65 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const decodedToken = await this.verifyFirebaseToken(dto.firebaseIdToken);
+    const email = decodedToken.email;
+    if (!email) {
+      throw new UnauthorizedException('Firebase account email is required');
+    }
 
     const existingUser = await this.prisma.user.findUnique({
       where: { firebaseUid: decodedToken.uid },
     });
     if (existingUser) {
-      throw new ConflictException('User already registered');
+      await this.prisma.streak.upsert({
+        where: { userId: existingUser.id },
+        update: {},
+        create: { userId: existingUser.id },
+      });
+
+      return {
+        id: existingUser.id,
+        name: existingUser.displayName,
+        email: existingUser.email,
+        emailVerified: existingUser.emailVerified,
+        phoneVerified: existingUser.phoneVerified,
+        createdAt: existingUser.createdAt,
+      };
+    }
+
+    const existingEmailUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingEmailUser) {
+      const relinkedUser = await this.prisma.user.update({
+        where: { id: existingEmailUser.id },
+        data: {
+          firebaseUid: decodedToken.uid,
+          emailVerified: decodedToken.email_verified ?? existingEmailUser.emailVerified,
+          displayName: existingEmailUser.displayName || dto.name,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+        },
+      });
+
+      await this.prisma.streak.upsert({
+        where: { userId: relinkedUser.id },
+        update: {},
+        create: { userId: relinkedUser.id },
+      });
+
+      return {
+        id: relinkedUser.id,
+        name: relinkedUser.displayName,
+        email: relinkedUser.email,
+        emailVerified: relinkedUser.emailVerified,
+        phoneVerified: relinkedUser.phoneVerified,
+        createdAt: relinkedUser.createdAt,
+      };
     }
 
     const user = await this.prisma.user.create({
       data: {
-        email: decodedToken.email!,
+        email,
         displayName: dto.name,
         firebaseUid: decodedToken.uid,
         emailVerified: decodedToken.email_verified ?? false,
@@ -28,9 +76,11 @@ export class AuthService {
       },
     });
 
-    // Create initial streak record
-    await this.prisma.streak.create({
-      data: { userId: user.id },
+    // Ensure an initial streak exists for both new and recovered users.
+    await this.prisma.streak.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
     });
 
     return {

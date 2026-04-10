@@ -11,6 +11,54 @@ import { PrismaService } from '../prisma/prisma.service';
 export class FirebaseAuthGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async resolveDbUser(decodedToken: admin.auth.DecodedIdToken) {
+    const existingByUid = await this.prisma.user.findUnique({
+      where: { firebaseUid: decodedToken.uid },
+    });
+    if (existingByUid) return existingByUid;
+
+    const email = decodedToken.email;
+    if (!email) {
+      throw new UnauthorizedException(
+        'Account email is missing. Please sign in again with an email provider.',
+      );
+    }
+
+    const existingByEmail = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    const displayNameFromToken =
+      decodedToken.name || email.split('@')[0] || 'SwapStyle User';
+
+    const user = existingByEmail
+      ? await this.prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: {
+            firebaseUid: decodedToken.uid,
+            emailVerified:
+              decodedToken.email_verified ?? existingByEmail.emailVerified,
+            displayName: existingByEmail.displayName || displayNameFromToken,
+          },
+        })
+      : await this.prisma.user.create({
+          data: {
+            email,
+            displayName: displayNameFromToken,
+            firebaseUid: decodedToken.uid,
+            emailVerified: decodedToken.email_verified ?? false,
+          },
+        });
+
+    await this.prisma.streak.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+    });
+
+    return user;
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
@@ -24,16 +72,8 @@ export class FirebaseAuthGuard implements CanActivate {
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
 
-      // Look up the internal DB user by Firebase UID
-      const dbUser = await this.prisma.user.findUnique({
-        where: { firebaseUid: decodedToken.uid },
-      });
-
-      if (!dbUser) {
-        throw new UnauthorizedException(
-          'Account does not exist. Please register first.',
-        );
-      }
+      // Resolve account for legacy users by Firebase UID or email.
+      const dbUser = await this.resolveDbUser(decodedToken);
 
       const dbUserAny = dbUser as any;
       if (
