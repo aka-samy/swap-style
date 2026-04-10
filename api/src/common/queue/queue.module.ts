@@ -2,17 +2,46 @@ import { Module, Global } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 
+function parseRedisUrl(redisUrl: string) {
+  const parsed = new URL(redisUrl);
+  const isTls = parsed.protocol === 'rediss:';
+  return {
+    host: parsed.hostname,
+    port: Number(parsed.port || 6379),
+    username: parsed.username || undefined,
+    password: parsed.password || undefined,
+    tls: isTls ? {} : undefined,
+  };
+}
+
 @Global()
 @Module({
   imports: [
     BullModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
-        skipVersionCheck: true,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const redisUrl =
+          configService.get<string>('REDIS_URL') ||
+          configService.get<string>('REDIS_PRIVATE_URL') ||
+          configService.get<string>('REDIS_PUBLIC_URL');
+
+        const connection = redisUrl
+          ? parseRedisUrl(redisUrl)
+          : {
+              host: configService.get<string>('REDIS_HOST', 'localhost'),
+              port: configService.get<number>('REDIS_PORT', 6379),
+              username:
+                configService.get<string>('REDIS_USERNAME') ||
+                configService.get<string>('REDIS_USER') ||
+                undefined,
+              password:
+                configService.get<string>('REDIS_PASSWORD') || undefined,
+            };
+
+        return {
+          connection,
+          skipVersionCheck: true,
+        };
+      },
       inject: [ConfigService],
     }),
   ],

@@ -4,15 +4,44 @@ import Redis from 'ioredis';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
+function parseRedisUrl(redisUrl: string) {
+  const parsed = new URL(redisUrl);
+  const isTls = parsed.protocol === 'rediss:';
+  return {
+    host: parsed.hostname,
+    port: Number(parsed.port || 6379),
+    username: parsed.username || undefined,
+    password: parsed.password || undefined,
+    tls: isTls ? {} : undefined,
+  };
+}
+
 @Global()
 @Module({
   providers: [
     {
       provide: REDIS_CLIENT,
       useFactory: (configService: ConfigService) => {
+        const redisUrl =
+          configService.get<string>('REDIS_URL') ||
+          configService.get<string>('REDIS_PRIVATE_URL') ||
+          configService.get<string>('REDIS_PUBLIC_URL');
+
+        const options = redisUrl
+          ? parseRedisUrl(redisUrl)
+          : {
+              host: configService.get<string>('REDIS_HOST', 'localhost'),
+              port: configService.get<number>('REDIS_PORT', 6379),
+              username:
+                configService.get<string>('REDIS_USERNAME') ||
+                configService.get<string>('REDIS_USER') ||
+                undefined,
+              password:
+                configService.get<string>('REDIS_PASSWORD') || undefined,
+            };
+
         return new Redis({
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
+          ...options,
           maxRetriesPerRequest: 3,
         });
       },

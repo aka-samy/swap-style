@@ -4,6 +4,15 @@ set -e
 echo "=== Container starting ==="
 echo "NODE_ENV: $NODE_ENV"
 echo "PORT: $PORT"
+if [ -z "$DATABASE_URL" ]; then
+  if [ -n "$DATABASE_PRIVATE_URL" ]; then
+    export DATABASE_URL="$DATABASE_PRIVATE_URL"
+  elif [ -n "$DATABASE_PUBLIC_URL" ]; then
+    export DATABASE_URL="$DATABASE_PUBLIC_URL"
+  elif [ -n "$POSTGRES_URL" ]; then
+    export DATABASE_URL="$POSTGRES_URL"
+  fi
+fi
 echo "DATABASE_URL is set: $([ -n "$DATABASE_URL" ] && echo 'YES' || echo 'NO')"
 echo "REDIS_HOST: $REDIS_HOST"
 echo "==========================="
