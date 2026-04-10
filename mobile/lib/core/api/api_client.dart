@@ -71,11 +71,19 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    final existingToken = _client.authToken;
+    if (existingToken != null) {
+      options.headers['Authorization'] = 'Bearer $existingToken';
+    }
+
     // Auto-refresh token if we have a Firebase user but token might be stale
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null && _client.authToken == null) {
+    if (user != null && existingToken == null) {
       final token = await user.getIdToken();
-      if (token != null) _client.setAuthToken(token);
+      if (token != null) {
+        _client.setAuthToken(token);
+        options.headers['Authorization'] = 'Bearer $token';
+      }
     }
     handler.next(options);
   }

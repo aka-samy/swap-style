@@ -16,13 +16,41 @@ final _userRatingsProvider =
     FutureProvider.family<RatingsPage, String>((ref, userId) async {
   final client = ref.watch(apiClientProvider);
   final response = await client.dio.get('/users/$userId/ratings');
-  final ratings = (response.data as List)
-      .map((e) => Rating.fromJson(e as Map<String, dynamic>))
-      .toList();
-  final avg = ratings.isEmpty
-      ? 0.0
-      : ratings.map((r) => r.score).reduce((a, b) => a + b) / ratings.length;
-  return RatingsPage(ratings: ratings, average: avg);
+  final payload = response.data;
+
+  if (payload is List) {
+    final ratings = payload
+        .map((e) => Rating.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final avg = ratings.isEmpty
+        ? 0.0
+        : ratings.map((r) => r.score).reduce((a, b) => a + b) / ratings.length;
+    return RatingsPage(ratings: ratings, average: avg);
+  }
+
+  if (payload is Map<String, dynamic>) {
+    final ratingsJson =
+        (payload['ratings'] as List<dynamic>?) ??
+        (payload['data'] as List<dynamic>?) ??
+        const <dynamic>[];
+
+    final ratings = ratingsJson
+        .whereType<Map<String, dynamic>>()
+        .map(Rating.fromJson)
+        .toList();
+
+    final averageRaw = payload['average'];
+    final average = averageRaw is num
+        ? averageRaw.toDouble()
+        : (ratings.isEmpty
+            ? 0.0
+            : ratings.map((r) => r.score).reduce((a, b) => a + b) /
+                ratings.length);
+
+    return RatingsPage(ratings: ratings, average: average);
+  }
+
+  return const RatingsPage(ratings: [], average: 0);
 });
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -55,6 +83,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     Future.microtask(() {
       ref.read(profileProvider.notifier).loadProfile();
       ref.read(profileProvider.notifier).loadWishlist();
+      ref.read(itemsProvider.notifier).loadMyItems();
+      ref.read(matchingProvider.notifier).loadMatches();
     });
   }
 
@@ -559,6 +589,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final itemState = ref.watch(itemsProvider);
     if (itemState.isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (itemState.error != null && itemState.items.isEmpty) {
+      return _emptyState(
+        theme,
+        icon: Icons.error_outline_rounded,
+        title: 'Could not load closet',
+        subtitle: itemState.error!,
+        actionLabel: 'Retry',
+        onAction: () => ref.read(itemsProvider.notifier).loadMyItems(),
+      );
     }
     if (itemState.items.isEmpty) {
       return _emptyState(

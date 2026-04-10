@@ -36,6 +36,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
   final List<File> _newPhotos = [];
   List<String> _existingPhotoUrls = [];
   final _picker = ImagePicker();
+  static const int _maxPhotos = 7;
 
   static const List<double> _shoeSizesEu = [
     35,
@@ -166,9 +167,9 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
   Future<void> _pickPhoto(ImageSource source) async {
     final totalPhotos = _existingPhotoUrls.length + _newPhotos.length;
-    if (totalPhotos >= 5) {
+    if (totalPhotos >= _maxPhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 5 photos allowed')),
+        SnackBar(content: Text('Maximum $_maxPhotos photos allowed')),
       );
       return;
     }
@@ -282,7 +283,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                           ],
                         ),
                       )),
-                  if (_existingPhotoUrls.length + _newPhotos.length < 5)
+                  if (_existingPhotoUrls.length + _newPhotos.length < _maxPhotos)
                     GestureDetector(
                       onTap: _showPhotoOptions,
                       child: Container(
@@ -305,7 +306,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                                     Theme.of(context).colorScheme.primary),
                             const SizedBox(height: 4),
                             Text(
-                                '${_existingPhotoUrls.length + _newPhotos.length}/5',
+                                '${_existingPhotoUrls.length + _newPhotos.length}/$_maxPhotos',
                                 style: Theme.of(context).textTheme.bodySmall),
                           ],
                         ),
@@ -341,9 +342,9 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
             TextFormField(
               controller: _brandController,
-              decoration: const InputDecoration(labelText: 'Brand'),
+              decoration: const InputDecoration(labelText: 'Title'),
               validator: (v) =>
-                  (v == null || v.isEmpty) ? 'Brand is required' : null,
+                  (v == null || v.trim().isEmpty) ? 'Title is required' : null,
             ),
             const SizedBox(height: 16),
 

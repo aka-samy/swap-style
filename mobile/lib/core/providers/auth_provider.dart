@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -58,15 +60,45 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
   final LocationService _locationService;
-  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  late final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
+  static const Duration _bootstrapTimeout = Duration(seconds: 20);
+  static const Duration _idTokenTimeout = Duration(seconds: 12);
+  static const Duration _sessionHydrationTimeout = Duration(seconds: 15);
 
   AuthNotifier(this._apiClient, this._locationService) : super(const AuthState()) {
     _bootstrap();
   }
 
   Future<void> _bootstrap() async {
-    await checkAuthStatus();
+    try {
+      await checkAuthStatus().timeout(_bootstrapTimeout);
+    } on TimeoutException {
+      _apiClient.clearAuthToken();
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearUserId: true,
+        clearToken: true,
+        clearDisplayName: true,
+        role: AppUserRole.user,
+        error: 'Startup took too long. Please sign in again.',
+        isLoading: false,
+      );
+    } catch (e) {
+      _apiClient.clearAuthToken();
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearUserId: true,
+        clearToken: true,
+        clearDisplayName: true,
+        role: AppUserRole.user,
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not restore session. Please sign in again.',
+        ),
+        isLoading: false,
+      );
+    }
   }
 
   AppUserRole _roleFromBackend(dynamic roleValue) {
@@ -219,16 +251,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> checkAuthStatus() async {
     state = state.copyWith(isLoading: true, clearError: true);
-    final firebaseUser = _firebaseAuth.currentUser;
-    if (firebaseUser != null) {
-      try {
-        final idToken = await firebaseUser.getIdToken();
+    try {
+      final firebaseUser = _firebaseAuth.currentUser;
+      if (firebaseUser != null) {
+        final idToken = await firebaseUser
+            .getIdToken()
+            .timeout(_idTokenTimeout, onTimeout: () => null);
         if (idToken != null) {
           final hydrated = await _hydrateBackendSession(
             firebaseUser: firebaseUser,
             idToken: idToken,
-            allowAutoRegister: false,
+            allowAutoRegister: true,
             allowOfflineFallback: true,
+          ).timeout(
+            _sessionHydrationTimeout,
+            onTimeout: () {
+              state = state.copyWith(
+                error: 'Could not reach server. Please sign in again.',
+              );
+              return false;
+            },
           );
           if (hydrated) {
             state = state.copyWith(isLoading: false);
@@ -243,15 +285,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
             return;
           }
         }
-      } catch (e) {
-        state = state.copyWith(
-          error: ApiErrorMapper.toUserMessage(
-            e,
-            fallback: 'Could not restore session. Please sign in again.',
-          ),
-        );
       }
+    } catch (e) {
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not restore session. Please sign in again.',
+        ),
+      );
     }
+
+    _apiClient.clearAuthToken();
     state = state.copyWith(
       status: AuthStatus.unauthenticated,
       clearUserId: true,
@@ -282,7 +326,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final ok = await _hydrateBackendSession(
         firebaseUser: firebaseUser!,
         idToken: idToken,
-        allowAutoRegister: false,
+        allowAutoRegister: true,
       );
 
       if (!ok) {

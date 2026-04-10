@@ -5,6 +5,43 @@ class DiscoveryRepository {
 
   DiscoveryRepository(this._client);
 
+  static const _validSizes = {
+    'XS',
+    'S',
+    'M',
+    'L',
+    'XL',
+    'XXL',
+    'ONE_SIZE',
+  };
+
+  static const _validCategories = {
+    'shirt': 'Shirt',
+    'hoodie': 'Hoodie',
+    'pants': 'Pants',
+    'shoes': 'Shoes',
+    'jacket': 'Jacket',
+    'dress': 'Dress',
+    'accessories': 'Accessories',
+    'other': 'Other',
+  };
+
+  String? _normalizeSize(String? size) {
+    if (size == null) return null;
+    final trimmed = size.trim();
+    if (trimmed.isEmpty) return null;
+
+    final normalized = trimmed.toUpperCase().replaceAll(' ', '_');
+    return _validSizes.contains(normalized) ? normalized : null;
+  }
+
+  String? _normalizeCategory(String? category) {
+    if (category == null) return null;
+    final key = category.trim().toLowerCase();
+    if (key.isEmpty) return null;
+    return _validCategories[key];
+  }
+
   Future<FeedResult> getFeed({
     required double latitude,
     required double longitude,
@@ -15,15 +52,28 @@ class DiscoveryRepository {
     String? category,
     double? shoeSizeEu,
   }) async {
+    final safeLatitude = latitude.isFinite ? latitude : 30.0444;
+    final safeLongitude = longitude.isFinite ? longitude : 31.2357;
+    final safePage = page < 1 ? 1 : page;
+    final safeLimit = limit.clamp(1, 50);
+    final safeRadius = radiusKm.isFinite && radiusKm >= 1 ? radiusKm : 50.0;
+
+    final normalizedCategory = _normalizeCategory(category);
+    final normalizedSize = _normalizeSize(size);
+    final normalizedShoeSize =
+        normalizedCategory == 'Shoes' && shoeSizeEu != null && shoeSizeEu.isFinite
+        ? shoeSizeEu
+        : null;
+
     final response = await _client.dio.get('/discovery/feed', queryParameters: {
-      'latitude': latitude,
-      'longitude': longitude,
-      'page': page,
-      'limit': limit,
-      'radiusKm': radiusKm,
-      if (size != null) 'size': size,
-      if (category != null) 'category': category,
-      if (shoeSizeEu != null) 'shoeSizeEu': shoeSizeEu,
+      'latitude': safeLatitude,
+      'longitude': safeLongitude,
+      'page': safePage,
+      'limit': safeLimit,
+      'radiusKm': safeRadius,
+      if (normalizedSize != null) 'size': normalizedSize,
+      if (normalizedCategory != null) 'category': normalizedCategory,
+      if (normalizedShoeSize != null) 'shoeSizeEu': normalizedShoeSize,
     });
     return FeedResult.fromJson(response.data);
   }

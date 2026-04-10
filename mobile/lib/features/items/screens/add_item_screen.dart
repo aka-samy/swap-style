@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/api/api_error_mapper.dart';
 import '../../../core/models/item.dart';
 import '../../../core/services/location_service.dart';
 import '../providers/items_provider.dart';
@@ -16,7 +17,7 @@ class AddItemScreen extends ConsumerStatefulWidget {
 
 class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _brandController = TextEditingController();
+  final _titleController = TextEditingController();
   final _notesController = TextEditingController();
   final _picker = ImagePicker();
 
@@ -26,6 +27,8 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   ItemCondition _condition = ItemCondition.good;
   bool _isSubmitting = false;
   final List<File> _photos = [];
+  static const int _minPhotos = 1;
+  static const int _maxPhotos = 7;
 
   static const List<double> _shoeSizesEu = [
     35,
@@ -46,15 +49,15 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
 
   @override
   void dispose() {
-    _brandController.dispose();
+    _titleController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
-    if (_photos.length >= 5) {
+    if (_photos.length >= _maxPhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 5 photos allowed')),
+        SnackBar(content: Text('Maximum $_maxPhotos photos allowed')),
       );
       return;
     }
@@ -99,48 +102,110 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSubmitting = true);
 
-    // Get real GPS location
-    final location = await ref.read(currentLocationProvider.future);
-
-    final item = await ref.read(itemsProvider.notifier).createItem(
-        category: _category.apiValue,
-          brand: _brandController.text.trim(),
-        size: _category == ItemCategory.shoes
-          ? ItemSize.oneSize.apiValue
-          : _size.apiValue,
-        shoeSizeEu: _category == ItemCategory.shoes ? _shoeSizeEu : null,
-        condition: _condition.apiValue,
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
-          latitude: location.latitude,
-          longitude: location.longitude,
-        );
-
-    // Upload photos if item was created
-    if (item != null && _photos.isNotEmpty) {
-      for (final photo in _photos) {
-        await ref.read(itemsProvider.notifier).uploadPhoto(item.id, photo);
-      }
+    if (_photos.length < _minPhotos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Add at least $_minPhotos photo to list this item')),
+      );
+      return;
     }
 
-    setState(() => _isSubmitting = false);
-    if (mounted) {
-      if (item != null) {
+    setState(() => _isSubmitting = true);
+
+    try {
+      final location = await ref.read(currentLocationProvider.future).timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => LocationData.fallback,
+          );
+
+      final item = await ref.read(itemsProvider.notifier).createItem(
+        category: _category.apiValue,
+        brand: _titleController.text.trim(),
+        size: _category == ItemCategory.shoes
+            ? ItemSize.oneSize.apiValue
+            : _size.apiValue,
+        shoeSizeEu: _category == ItemCategory.shoes ? _shoeSizeEu : null,
+        condition: _condition.apiValue,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+        latitude: location.latitude,
+        longitude: location.longitude,
+      );
+
+      if (item == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(ref.read(itemsProvider).error ?? 'Failed to add item'),
+            ),
+          );
+        }
+        return;
+      }
+
+      var failedUploads = 0;
+      var successfulUploads = 0;
+      if (_photos.isNotEmpty) {
+        for (final photo in _photos) {
+          final ok = await ref.read(itemsProvider.notifier).uploadPhoto(item.id, photo);
+          if (ok) {
+            successfulUploads++;
+          } else {
+            failedUploads++;
+          }
+        }
+      }
+
+      if (successfulUploads == 0) {
+        await ref.read(itemsProvider.notifier).deleteItem(item.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Listing failed: at least 1 photo must upload successfully.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      if (failedUploads == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item added!')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  ref.read(itemsProvider).error ?? 'Failed to add item')),
+            content: Text(
+              'Item added, but $failedUploads photo(s) failed to upload.',
+            ),
+          ),
         );
       }
       Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ApiErrorMapper.toUserMessage(
+                e,
+                fallback: 'Failed to list item. Please try again.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -194,7 +259,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                           ],
                         ),
                       )),
-                  if (_photos.length < 5)
+                  if (_photos.length < _maxPhotos)
                     GestureDetector(
                       onTap: _showPhotoOptions,
                       child: Container(
@@ -213,7 +278,7 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
                                 size: 32,
                                 color: theme.colorScheme.primary),
                             const SizedBox(height: 4),
-                            Text('${_photos.length}/5',
+                            Text('${_photos.length}/$_maxPhotos',
                                 style: theme.textTheme.bodySmall),
                           ],
                         ),
@@ -248,12 +313,12 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Brand
+            // Title
             TextFormField(
-              controller: _brandController,
-              decoration: const InputDecoration(labelText: 'Brand'),
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
               validator: (v) =>
-                  (v == null || v.isEmpty) ? 'Brand is required' : null,
+                  (v == null || v.trim().isEmpty) ? 'Title is required' : null,
             ),
             const SizedBox(height: 16),
 

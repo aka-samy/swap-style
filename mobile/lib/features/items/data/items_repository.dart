@@ -60,7 +60,13 @@ class ItemsRepository {
   }
 
   Future<void> uploadPhoto(String uploadUrl, List<int> bytes, String contentType) async {
-    await Dio().put(
+    await Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    ).put(
       uploadUrl,
       data: bytes,
       options: Options(headers: {'Content-Type': contentType}),
