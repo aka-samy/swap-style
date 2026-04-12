@@ -42,9 +42,20 @@ function initFirebase() {
 async function bootstrap() {
   initFirebase();
   const app = await NestFactory.create(AppModule);
+  const isDev = process.env.NODE_ENV !== 'production';
 
   // Security headers
-  app.use(helmet());
+  app.use(
+    helmet(
+      isDev
+        ? {
+            // Swagger UI on HTTP LAN can render blank if CSP upgrades assets to HTTPS.
+            contentSecurityPolicy: false,
+            crossOriginEmbedderPolicy: false,
+          }
+        : undefined,
+    ),
+  );
 
   app.setGlobalPrefix('api/v1');
 
@@ -60,7 +71,6 @@ async function bootstrap() {
 
   // In development, allow all origins for mobile device testing
   // In production, restrict to ALLOWED_ORIGINS env variable
-  const isDev = process.env.NODE_ENV !== 'production';
   app.enableCors({
     origin: isDev
       ? true
@@ -77,6 +87,7 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api', app, document);
 
   const port = process.env.PORT || 3000;
   // Listen on 0.0.0.0 to accept connections from physical devices on the network
