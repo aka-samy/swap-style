@@ -24,7 +24,6 @@ import '../../features/matching/screens/match_detail_screen.dart';
 import '../../features/chat/screens/conversation_screen.dart';
 import '../../features/chat/screens/chat_list_screen.dart';
 import '../../features/profile/screens/public_profile_screen.dart';
-import '../../features/profile/screens/wishlist_screen.dart';
 import '../../features/gamification/screens/gamification_screen.dart';
 import '../../features/admin/screens/admin_panel_screen.dart';
 
@@ -138,8 +137,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/notifications',
-                builder: (context, state) => const NotificationsScreen(),
+                path: '/chats',
+                builder: (context, state) => const ChatListScreen(),
               ),
             ],
           ),
@@ -149,10 +148,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
                 routes: [
-                  GoRoute(
-                    path: 'wishlist',
-                    builder: (context, state) => const WishlistScreen(),
-                  ),
                   GoRoute(
                     path: 'achievements',
                     builder: (context, state) =>
@@ -167,6 +162,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'chats',
                     builder: (context, state) => const ChatListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'edit/:id',
+                    builder: (context, state) => EditItemScreen(
+                      itemId: state.pathParameters['id']!,
+                      from: '/profile',
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) =>
+                        const NotificationsScreen(),
                   ),
                 ],
               ),
@@ -212,9 +219,9 @@ class ScaffoldWithNavBar extends StatelessWidget {
             label: 'Closet',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Chats',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

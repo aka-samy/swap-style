@@ -44,3 +44,7 @@ mobile/.flutter-plugins-dependencies
 
 # Misc
 *.tmp
+
+# Local Redis runtime artifacts
+Memurai-Developer-v4.1.2/
+tools/memurai/

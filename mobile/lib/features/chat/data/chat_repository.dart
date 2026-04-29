@@ -35,13 +35,28 @@ class ChatRepository {
     await _client.dio.patch('/matches/$matchId/messages/read');
   }
 
+  String _buildSocketBaseUrl(String serverUrl) {
+    final uri = Uri.parse(serverUrl);
+    final hasCustomPort = uri.port != 80 && uri.port != 443;
+    return '${uri.scheme}://${uri.host}${hasCustomPort ? ':${uri.port}' : ''}';
+  }
+
   // Socket.IO real-time
   void connect(String serverUrl, String token) {
+    final socketBaseUrl = _buildSocketBaseUrl(serverUrl);
+
+    _socket?.disconnect();
+    _socket?.dispose();
+
     _socket = IO.io(
-      '$serverUrl/chat',
+      '$socketBaseUrl/chat',
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .setAuth({'token': token})
+          .enableReconnection()
+          .setReconnectionAttempts(8)
+          .setReconnectionDelay(1200)
+          .setTimeout(12000)
           .enableAutoConnect()
           .build(),
     );
@@ -72,8 +87,22 @@ class ChatRepository {
     });
   }
 
+  void onConnected(void Function() callback) {
+    _socket?.onConnect((_) => callback());
+  }
+
+  void onDisconnected(void Function(String reason) callback) {
+    _socket?.onDisconnect((reason) => callback(reason.toString()));
+  }
+
+  void onConnectionError(void Function(String message) callback) {
+    _socket?.onConnectError((error) => callback(error.toString()));
+    _socket?.onError((error) => callback(error.toString()));
+  }
+
   void disconnect() {
     _socket?.disconnect();
+    _socket?.dispose();
     _socket = null;
   }
 }

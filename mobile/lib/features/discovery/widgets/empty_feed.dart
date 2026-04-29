@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 class EmptyFeed extends StatelessWidget {
-  const EmptyFeed({super.key, this.onAdjustFilters});
+  const EmptyFeed({
+    super.key,
+    this.onAdjustFilters,
+    this.onOpenChats,
+  });
 
   final VoidCallback? onAdjustFilters;
+  final VoidCallback? onOpenChats;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +45,14 @@ class EmptyFeed extends StatelessWidget {
               icon: const Icon(Icons.tune),
               label: const Text('Adjust Filters'),
             ),
+            if (onOpenChats != null) ...[
+              const SizedBox(height: 12),
+              FilledButton.tonalIcon(
+                onPressed: onOpenChats,
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text('Open Chats'),
+              ),
+            ],
           ],
         ),
       ),

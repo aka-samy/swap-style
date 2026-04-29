@@ -4,6 +4,8 @@ part 'item.freezed.dart';
 part 'item.g.dart';
 
 enum ItemCategory {
+  @JsonValue('TShirt')
+  tShirt,
   @JsonValue('Shirt')
   shirt,
   @JsonValue('Hoodie')
@@ -25,6 +27,8 @@ enum ItemCategory {
 extension ItemCategoryX on ItemCategory {
   String get apiValue {
     switch (this) {
+      case ItemCategory.tShirt:
+        return 'TShirt';
       case ItemCategory.shirt:
         return 'Shirt';
       case ItemCategory.hoodie:

@@ -148,16 +148,48 @@ class _ItemCard extends StatelessWidget {
               child: Container(
                 color: theme.colorScheme.surfaceContainerHighest,
                 child: item.photos.isNotEmpty
-                    ? Image.network(
-                        item.photos.first.url,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Icon(Icons.checkroom_rounded,
-                              size: 40,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withAlpha(100)),
-                        ),
+                    ? Stack(
+                        children: [
+                          PageView.builder(
+                            itemCount: item.photos.length,
+                            itemBuilder: (context, index) {
+                              return Image.network(
+                                item.photos[index].url,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.checkroom_rounded,
+                                    size: 40,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withAlpha(100),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          if (item.photos.length > 1)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(130),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${item.photos.length} photos',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       )
                     : Center(
                         child: Icon(Icons.checkroom_rounded,

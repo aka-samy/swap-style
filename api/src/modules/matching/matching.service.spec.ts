@@ -2,21 +2,32 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MatchingService } from './matching.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { ChatService } from '../chat/chat.service';
 
 describe('MatchingService', () => {
   let service: MatchingService;
 
   const mockPrisma = {
+    item: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+    },
     match: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
+    },
+    message: {
       count: jest.fn(),
     },
     like: { findFirst: jest.fn() },
   };
 
   const mockGamification = { recordActivity: jest.fn() };
+  const mockChat = { createMessage: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,6 +35,7 @@ describe('MatchingService', () => {
         MatchingService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GamificationService, useValue: mockGamification },
+        { provide: ChatService, useValue: mockChat },
       ],
     }).compile();
 
@@ -68,6 +80,59 @@ describe('MatchingService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('openChatForItem', () => {
+    it('should create a match and send default contextual message when chat is new', async () => {
+      mockPrisma.item.findUnique.mockResolvedValue({
+        id: 'item-target',
+        brand: 'Nike jacket',
+        category: 'Jacket',
+        status: 'available',
+        ownerId: 'user-2',
+      });
+      mockPrisma.item.findFirst.mockResolvedValue({ id: 'item-owned' });
+      mockPrisma.match.findFirst.mockResolvedValue(null);
+      mockPrisma.match.create.mockResolvedValue({ id: 'match-1' });
+      mockPrisma.message.count.mockResolvedValue(0);
+
+      await service.openChatForItem('user-1', 'item-target');
+
+      expect(mockPrisma.match.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userAId: 'user-1',
+            userBId: 'user-2',
+            itemAId: 'item-owned',
+            itemBId: 'item-target',
+          }),
+        }),
+      );
+      expect(mockChat.createMessage).toHaveBeenCalledWith(
+        'match-1',
+        'user-1',
+        expect.stringContaining('Nike jacket'),
+      );
+    });
+
+    it('should reuse existing match and skip sending initial message when conversation exists', async () => {
+      mockPrisma.item.findUnique.mockResolvedValue({
+        id: 'item-target',
+        brand: 'Nike jacket',
+        category: 'Jacket',
+        status: 'available',
+        ownerId: 'user-2',
+      });
+      mockPrisma.item.findFirst.mockResolvedValue({ id: 'item-owned' });
+      mockPrisma.match.findFirst.mockResolvedValue({ id: 'match-existing' });
+      mockPrisma.message.count.mockResolvedValue(2);
+
+      const result = await service.openChatForItem('user-1', 'item-target');
+
+      expect(result.id).toBe('match-existing');
+      expect(mockPrisma.match.create).not.toHaveBeenCalled();
+      expect(mockChat.createMessage).not.toHaveBeenCalled();
     });
   });
 

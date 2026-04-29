@@ -57,7 +57,11 @@ export class ItemsService {
   ) {
     const { page = 1, limit = 20, status } = query;
     const where: any = { ownerId: userId };
-    if (status) where.status = status;
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = { not: 'removed' };
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.item.findMany({
@@ -158,6 +162,67 @@ export class ItemsService {
 
     return this.prisma.itemVerification.create({
       data: { itemId, ...data },
+    });
+  }
+
+  async getItemStats(itemId: string) {
+    await this.findOne(itemId);
+
+    const activeStatuses: MatchStatus[] = [
+      MatchStatus.pending,
+      MatchStatus.negotiating,
+      MatchStatus.agreed,
+      MatchStatus.awaiting_confirmation,
+    ];
+
+    const [likesCount, totalMatches, activeMatches] = await Promise.all([
+      this.prisma.like.count({
+        where: {
+          itemId,
+          isLike: true,
+        },
+      }),
+      this.prisma.match.count({
+        where: {
+          OR: [{ itemAId: itemId }, { itemBId: itemId }],
+        },
+      }),
+      this.prisma.match.count({
+        where: {
+          OR: [{ itemAId: itemId }, { itemBId: itemId }],
+          status: { in: activeStatuses },
+        },
+      }),
+    ]);
+
+    return {
+      itemId,
+      likesCount,
+      totalMatches,
+      activeMatches,
+    };
+  }
+
+  async removePhoto(itemId: string, photoId: string, userId: string) {
+    const item = await this.findOne(itemId);
+    if (item.ownerId !== userId) {
+      throw new ForbiddenException('You can only remove photos from your own items');
+    }
+
+    if (item.photos.length <= 1) {
+      throw new BadRequestException('An item must have at least one photo');
+    }
+
+    const photo = await this.prisma.itemPhoto.findUnique({
+      where: { id: photoId },
+    });
+
+    if (!photo || photo.itemId !== itemId) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    await this.prisma.itemPhoto.delete({
+      where: { id: photoId },
     });
   }
 }

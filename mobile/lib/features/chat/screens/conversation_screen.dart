@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/api/api_client.dart';
+import '../../../core/models/match.dart';
 import '../../../core/models/message.dart';
+import '../../matching/data/matching_repository.dart';
 import '../providers/chat_provider.dart';
+
+final _chatMatchProvider =
+    FutureProvider.family<Match, String>((ref, matchId) async {
+  final client = ref.watch(apiClientProvider);
+  return MatchingRepository(client).getMatch(matchId);
+});
 
 class ConversationScreen extends ConsumerStatefulWidget {
   final String matchId;
@@ -22,6 +31,71 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _isTyping = false;
+
+  String _statusLabel(MatchStatus status) {
+    return switch (status) {
+      MatchStatus.pending => 'Pending',
+      MatchStatus.negotiating => 'Negotiating',
+      MatchStatus.agreed => 'Agreed',
+      MatchStatus.awaitingConfirmation => 'Awaiting confirmation',
+      MatchStatus.completed => 'Completed',
+      MatchStatus.canceled => 'Canceled',
+      MatchStatus.expired => 'Expired',
+    };
+  }
+
+  void _showMatchStatusSheet(Match? match) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Match Status',
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    match == null
+                        ? 'Loading status...'
+                        : _statusLabel(match.status),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      context.go('/matches/${widget.matchId}');
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    label: const Text('Open Match Details'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -60,6 +134,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = ref.watch(chatProvider(widget.matchId));
+    final matchAsync = ref.watch(_chatMatchProvider(widget.matchId));
+    final loadedMatch = matchAsync.maybeWhen(data: (m) => m, orElse: () => null);
     final messages = state.messages;
     final isLoading = state.isLoading;
     final typingUsers = state.typingUsers;
@@ -81,7 +157,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => context.pop(),
+                    tooltip: 'Back to chats',
+                    onPressed: () => context.go('/chats'),
                     icon: const Icon(Icons.arrow_back_rounded),
                   ),
                   Expanded(
@@ -100,12 +177,16 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                                 shape: BoxShape.circle,
                                 color: state.isConnected
                                     ? Colors.green
-                                    : Colors.orange,
+                                    : (state.error == null ? Colors.orange : Colors.red),
                               ),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              state.isConnected ? 'Connected' : 'Connecting...',
+                              state.isConnected
+                                  ? 'Connected'
+                                  : (state.error == null
+                                      ? 'Connecting...'
+                                      : 'Realtime unavailable'),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -116,9 +197,9 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () =>
-                        context.go('/matches/${widget.matchId}'),
-                    icon: const Icon(Icons.swap_horiz_rounded),
+                    tooltip: 'Match status',
+                    onPressed: () => _showMatchStatusSheet(loadedMatch),
+                    icon: const Icon(Icons.info_outline_rounded),
                     style: IconButton.styleFrom(
                       backgroundColor:
                           theme.colorScheme.surfaceContainerHighest,
@@ -244,6 +325,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
+                        tooltip: 'Send message',
                         onPressed: _send,
                         icon: Icon(
                           Icons.arrow_upward_rounded,

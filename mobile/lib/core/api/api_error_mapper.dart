@@ -8,7 +8,7 @@ class ApiErrorMapper {
     String fallback = 'Something went wrong. Please try again.',
   }) {
     if (error is SocketException) {
-      return 'No internet connection. Please check your network and try again.';
+      return 'Cannot reach the server. Check your internet or local backend connection and try again.';
     }
 
     if (error is DioException) {
@@ -17,7 +17,7 @@ class ApiErrorMapper {
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
         case DioExceptionType.connectionError:
-          return 'No internet connection. Please check your network and try again.';
+          return 'Cannot reach the server. Check your internet or local backend connection and try again.';
         case DioExceptionType.badResponse:
           final statusCode = error.response?.statusCode ?? 0;
           if (statusCode == 400) {

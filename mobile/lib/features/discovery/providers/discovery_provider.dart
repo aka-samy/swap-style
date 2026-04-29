@@ -8,6 +8,7 @@ class DiscoveryState {
   final List<FeedItem> cards;
   final bool isLoading;
   final bool hasMore;
+  final bool hasLoadedOnce;
   final String? error;
   final int currentPage;
 
@@ -15,6 +16,7 @@ class DiscoveryState {
     this.cards = const [],
     this.isLoading = false,
     this.hasMore = true,
+    this.hasLoadedOnce = false,
     this.error,
     this.currentPage = 1,
   });
@@ -23,6 +25,7 @@ class DiscoveryState {
     List<FeedItem>? cards,
     bool? isLoading,
     bool? hasMore,
+    bool? hasLoadedOnce,
     String? error,
     int? currentPage,
   }) {
@@ -30,6 +33,7 @@ class DiscoveryState {
       cards: cards ?? this.cards,
       isLoading: isLoading ?? this.isLoading,
       hasMore: hasMore ?? this.hasMore,
+      hasLoadedOnce: hasLoadedOnce ?? this.hasLoadedOnce,
       error: error,
       currentPage: currentPage ?? this.currentPage,
     );
@@ -64,12 +68,14 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
         cards: result.data,
         isLoading: false,
         hasMore: result.hasMore,
+        hasLoadedOnce: true,
         currentPage: 1,
       );
     } catch (e) {
       debugPrint(ApiErrorMapper.toDebugMessage(e));
       state = state.copyWith(
         isLoading: false,
+        hasLoadedOnce: true,
         error: ApiErrorMapper.toUserMessage(
           e,
           fallback: 'Could not load discovery feed',
@@ -141,6 +147,22 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
   /// Re-insert a card at the front (visual undo only)
   void undoSwipe(FeedItem item) {
     state = state.copyWith(cards: [item, ...state.cards]);
+  }
+
+  /// Move to next card without recording a swipe.
+  void showNextCard() {
+    if (state.cards.length < 2) return;
+    final first = state.cards.first;
+    final rest = state.cards.sublist(1);
+    state = state.copyWith(cards: [...rest, first]);
+  }
+
+  /// Move to previous card without recording a swipe.
+  void showPreviousCard() {
+    if (state.cards.length < 2) return;
+    final last = state.cards.last;
+    final rest = state.cards.sublist(0, state.cards.length - 1);
+    state = state.copyWith(cards: [last, ...rest]);
   }
 }
 

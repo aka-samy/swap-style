@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -119,7 +120,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       case 'too-many-requests':
         return 'Too many attempts. Try again later';
       case 'network-request-failed':
-        return 'No internet connection. Please check your network and try again.';
+        return 'Cannot reach Firebase authentication. Check your internet connection and try again.';
       default:
         return e.message ?? 'Sign in failed. Please try again.';
     }
@@ -134,13 +135,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       case 'invalid-email':
         return 'Invalid email address';
       case 'network-request-failed':
-        return 'No internet connection. Please check your network and try again.';
+        return 'Cannot reach Firebase authentication. Check your internet connection and try again.';
       default:
         return e.message ?? 'Registration failed. Please try again.';
     }
   }
 
   String _authDioMessage(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.connectionError) {
+      return 'Cannot reach backend at ${_apiClient.serverUrl}. Make sure the local server is running and reachable from your device.';
+    }
+
     final statusCode = e.response?.statusCode;
     if (statusCode == 401 || statusCode == 404) {
       return 'Account does not exist';
@@ -198,6 +206,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } on DioException catch (e) {
+      debugPrint('Auth hydrate error: ${ApiErrorMapper.toDebugMessage(e)}');
       final statusCode = e.response?.statusCode;
 
       if (allowAutoRegister && (statusCode == 401 || statusCode == 404)) {
@@ -217,6 +226,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           return true;
         } on DioException catch (registerError) {
+          debugPrint('Auth register hydration error: ${ApiErrorMapper.toDebugMessage(registerError)}');
           state = state.copyWith(error: _authDioMessage(registerError));
           return false;
         }
@@ -346,6 +356,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase signIn error code=${e.code} message=${e.message}');
       state = state.copyWith(error: _firebaseSignInMessage(e), isLoading: false);
       return false;
     } catch (e) {
@@ -413,9 +424,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase register error code=${e.code} message=${e.message}');
       state = state.copyWith(error: _firebaseRegisterMessage(e), isLoading: false);
       return false;
     } on DioException catch (e) {
+      debugPrint('Backend register error: ${ApiErrorMapper.toDebugMessage(e)}');
       // Roll back freshly created Firebase account if backend registration fails,
       // otherwise the user can get stuck with an unusable auth state.
       try {
@@ -498,6 +511,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Google signIn error code=${e.code} message=${e.message}');
       state = state.copyWith(error: _firebaseSignInMessage(e), isLoading: false);
       return false;
     } catch (e) {

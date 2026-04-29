@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/match.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../data/matching_repository.dart';
 import '../providers/matching_provider.dart';
 import 'propose_offer_screen.dart';
@@ -49,6 +50,13 @@ class MatchDetailScreen extends ConsumerWidget {
 
   Widget _buildContent(
       BuildContext context, WidgetRef ref, ThemeData theme, Match match) {
+    final currentUserId = ref.watch(authProvider).userId;
+    final isUserA = currentUserId == match.userAId;
+    final otherUserId = isUserA ? match.userBId : match.userAId;
+    final otherDisplayName =
+        (isUserA ? match.userB?.displayName : match.userA?.displayName) ??
+            'Seller';
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -59,6 +67,7 @@ class MatchDetailScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   IconButton(
+                    tooltip: 'Back',
                     onPressed: () => context.pop(),
                     icon: const Icon(Icons.arrow_back_rounded),
                   ),
@@ -138,6 +147,16 @@ class MatchDetailScreen extends ConsumerWidget {
                             context.go('/matches/$matchId/chat'),
                         icon: const Icon(Icons.chat_bubble_outline_rounded),
                         label: const Text('Open Chat'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            context.go('/profile/user/$otherUserId'),
+                        icon: const Icon(Icons.person_outline_rounded),
+                        label: Text('View $otherDisplayName Profile'),
                       ),
                     ),
                     const SizedBox(height: 10),

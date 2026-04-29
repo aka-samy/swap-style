@@ -102,7 +102,6 @@ function parseRedisUrl(redisUrl: string) {
 
         return {
           connection,
-          skipVersionCheck: true,
         };
       },
       inject: [ConfigService],

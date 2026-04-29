@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/api/api_client.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -83,6 +85,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authState = ref.watch(authProvider);
+    final apiClient = ref.watch(apiClientProvider);
     final isLoading = authState.isLoading;
     final error = authState.error;
 
@@ -266,6 +269,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   onPressed: isLoading ? null : () => context.go('/register'),
                   child: const Text('Create Account'),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Backend: ${apiClient.serverUrl}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 40),
               ],
             ),

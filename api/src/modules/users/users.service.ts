@@ -96,7 +96,7 @@ export class UsersService {
     const [data, total] = await Promise.all([
       this.prisma.item.findMany({
         where,
-        include: { photos: { take: 1, orderBy: { sortOrder: 'asc' } } },
+        include: { photos: { orderBy: { sortOrder: 'asc' } } },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { createdAt: 'desc' },

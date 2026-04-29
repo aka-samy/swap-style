@@ -89,7 +89,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
   SwaggerModule.setup('api', app, document);
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   // Listen on 0.0.0.0 to accept connections from physical devices on the network
   await app.listen(port, '0.0.0.0');
   console.log(`Application running on port ${port}`);

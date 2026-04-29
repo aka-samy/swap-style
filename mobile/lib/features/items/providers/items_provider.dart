@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_error_mapper.dart';
 import '../../../core/models/item.dart';
 import '../data/items_repository.dart';
 
@@ -53,7 +54,13 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
         totalItems: result.total,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not load closet. Please try again.',
+        ),
+      );
     }
   }
 
@@ -78,10 +85,18 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
         latitude: latitude,
         longitude: longitude,
       );
-      state = state.copyWith(items: [item, ...state.items]);
+      state = state.copyWith(
+        items: [item, ...state.items],
+        totalItems: state.totalItems + 1,
+      );
       return item;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not create item. Please try again.',
+        ),
+      );
       return null;
     }
   }
@@ -93,7 +108,12 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       state = state.copyWith(items: items);
       return true;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not update item. Please try again.',
+        ),
+      );
       return false;
     }
   }
@@ -103,10 +123,16 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       await _repository.deleteItem(id);
       state = state.copyWith(
         items: state.items.where((i) => i.id != id).toList(),
+        totalItems: state.totalItems > 0 ? state.totalItems - 1 : 0,
       );
       return true;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not delete item. Please try again.',
+        ),
+      );
       return false;
     }
   }
@@ -120,7 +146,35 @@ class ItemsNotifier extends StateNotifier<ItemsState> {
       await _repository.uploadPhoto(urlInfo.uploadUrl, bytes, contentType);
       return true;
     } catch (e) {
-      state = state.copyWith(error: 'Photo upload failed: $e');
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Photo upload failed. Please try again.',
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> deletePhoto(String itemId, String photoId) async {
+    try {
+      await _repository.deletePhoto(itemId, photoId);
+      final updatedItems = state.items.map((item) {
+        if (item.id == itemId) {
+          final updatedPhotos = item.photos.where((p) => p.id != photoId).toList();
+          return item.copyWith(photos: updatedPhotos);
+        }
+        return item;
+      }).toList();
+      state = state.copyWith(items: updatedItems);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        error: ApiErrorMapper.toUserMessage(
+          e,
+          fallback: 'Could not delete photo. Please try again.',
+        ),
+      );
       return false;
     }
   }

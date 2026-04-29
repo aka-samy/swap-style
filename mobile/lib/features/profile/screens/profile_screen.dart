@@ -9,6 +9,7 @@ import '../../../core/models/rating.dart';
 import '../../../core/models/item.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/ratings_list.dart';
+import '../../items/data/items_repository.dart';
 import '../../items/providers/items_provider.dart';
 import '../../matching/providers/matching_provider.dart';
 
@@ -79,10 +80,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     Future.microtask(() {
       ref.read(profileProvider.notifier).loadProfile();
-      ref.read(profileProvider.notifier).loadWishlist();
       ref.read(itemsProvider.notifier).loadMyItems();
       ref.read(matchingProvider.notifier).loadMatches();
     });
@@ -245,6 +245,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 user,
                 authState,
                 profileState.isLoading,
+                ref.watch(itemsProvider).totalItems,
               ),
             ),
             SliverPersistentHeader(
@@ -255,7 +256,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   tabs: const [
                     Tab(text: 'Closet'),
                     Tab(text: 'History'),
-                    Tab(text: 'Wishlist'),
                     Tab(text: 'Ratings'),
                   ],
                 ),
@@ -268,7 +268,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             children: [
               _buildClosetTab(theme),
               _buildHistoryTab(theme),
-              _buildWishlistTab(theme),
               _buildRatingsTab(theme),
             ],
           ),
@@ -282,6 +281,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     dynamic user,
     AuthState authState,
     bool isLoading,
+    int itemsCount,
   ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -295,6 +295,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       ?.copyWith(fontWeight: FontWeight.bold)),
               const Spacer(),
               IconButton(
+                tooltip: 'Notifications',
+                onPressed: () => context.go('/profile/notifications'),
+                icon: const Icon(Icons.notifications_outlined),
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                ),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Achievements',
                 onPressed: () => context.go('/profile/achievements'),
                 icon: const Icon(Icons.emoji_events_outlined),
                 style: IconButton.styleFrom(
@@ -303,6 +313,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               ),
               const SizedBox(width: 4),
               IconButton(
+                tooltip: 'Settings',
                 onPressed: () => _showSettingsSheet(),
                 icon: const Icon(Icons.settings_outlined),
                 style: IconButton.styleFrom(
@@ -316,7 +327,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           if (_isEditingProfile)
             _buildEditForm(theme)
           else
-            _buildProfileInfo(theme, user, authState, isLoading),
+            _buildProfileInfo(theme, user, authState, isLoading, itemsCount),
         ],
       ),
     );
@@ -327,6 +338,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     dynamic user,
     AuthState authState,
     bool isLoading,
+    int itemsCount,
   ) {
     final resolvedName = (user?.displayName as String?)?.trim().isNotEmpty == true
         ? user.displayName as String
@@ -337,42 +349,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return Column(
       children: [
         // Avatar
-        Stack(
-          children: [
-            CircleAvatar(
-              radius: 44,
-              backgroundColor: theme.colorScheme.primary.withAlpha(30),
-              backgroundImage: user?.profilePhotoUrl != null
-                  ? NetworkImage(user!.profilePhotoUrl!)
-                  : null,
-              child: user?.profilePhotoUrl == null
-                  ? Text(
-                    _safeInitial(resolvedName),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    )
-                  : null,
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: _startEditing,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: theme.colorScheme.surface, width: 2),
-                  ),
-                  child: const Icon(Icons.edit, size: 14, color: Colors.white),
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withAlpha(40),
+                blurRadius: 24,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 52,
+                backgroundColor: theme.colorScheme.surface,
+                child: CircleAvatar(
+                  radius: 48,
+                  backgroundColor: theme.colorScheme.primary.withAlpha(30),
+                  backgroundImage: user?.profilePhotoUrl != null
+                      ? NetworkImage(user!.profilePhotoUrl!)
+                      : null,
+                  child: user?.profilePhotoUrl == null
+                      ? Text(
+                        _safeInitial(resolvedName),
+                          style: TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        )
+                      : null,
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                bottom: 4,
+                right: 4,
+                child: GestureDetector(
+                  onTap: _startEditing,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.colorScheme.surface, width: 2),
+                    ),
+                    child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -394,39 +422,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _StatBadge(
-              icon: Icons.star_rounded,
-              iconColor: Colors.amber,
-              value: user?.stats?.averageRating?.toStringAsFixed(1) ?? '--',
-              label: '${user?.stats?.ratingCount ?? 0} reviews',
+            Expanded(
+              child: _StatBadge(
+                icon: Icons.star_rounded,
+                iconColor: Colors.amber,
+                value: user?.stats?.averageRating?.toStringAsFixed(1) ?? '--',
+                label: '${user?.stats?.ratingCount ?? 0} reviews',
+              ),
             ),
-            Container(
-              width: 1,
-              height: 32,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: theme.colorScheme.outlineVariant,
-            ),
-            _StatBadge(
-              icon: user?.emailVerified == true
-                  ? Icons.verified_rounded
-                  : Icons.shield_outlined,
-              iconColor: user?.emailVerified == true
-                  ? Colors.green
-                  : theme.colorScheme.onSurfaceVariant,
-              value: user?.emailVerified == true ? 'Verified' : 'Unverified',
-              label: 'Account',
-            ),
-            Container(
-              width: 1,
-              height: 32,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: theme.colorScheme.outlineVariant,
-            ),
-            _StatBadge(
-              icon: Icons.checkroom_rounded,
-              iconColor: theme.colorScheme.primary,
-              value: '${user?.stats?.itemCount ?? 0}',
-              label: 'Items',
+            const SizedBox(width: 16),
+            Expanded(
+              child: _StatBadge(
+                icon: Icons.checkroom_rounded,
+                iconColor: theme.colorScheme.primary,
+                value: '$itemsCount',
+                label: 'Items',
+              ),
             ),
           ],
         ),
@@ -442,43 +453,59 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         // Tappable avatar for photo change
         GestureDetector(
           onTap: _pickPhoto,
-          child: Stack(
-            children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: theme.colorScheme.primary.withAlpha(30),
-                backgroundImage: _pickedPhoto != null
-                    ? FileImage(_pickedPhoto!)
-                    : (user?.profilePhotoUrl != null
-                        ? NetworkImage(user!.profilePhotoUrl!)
-                        : null) as ImageProvider?,
-                child: _pickedPhoto == null && user?.profilePhotoUrl == null
-                    ? Text(
-                        _safeInitial(user?.displayName),
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      )
-                    : null,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: theme.colorScheme.surface, width: 2),
-                  ),
-                  child:
-                      const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withAlpha(40),
+                  blurRadius: 24,
+                  spreadRadius: 4,
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 52,
+                  backgroundColor: theme.colorScheme.surface,
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundColor: theme.colorScheme.primary.withAlpha(30),
+                    backgroundImage: _pickedPhoto != null
+                        ? FileImage(_pickedPhoto!)
+                        : (user?.profilePhotoUrl != null
+                            ? NetworkImage(user!.profilePhotoUrl!)
+                            : null) as ImageProvider?,
+                    child: _pickedPhoto == null && user?.profilePhotoUrl == null
+                        ? Text(
+                            _safeInitial(user?.displayName),
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: theme.colorScheme.surface, width: 2),
+                    ),
+                    child:
+                        const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -554,9 +581,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               },
             ),
             ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Messages'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.go('/chats');
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.notifications_outlined),
               title: const Text('Notifications'),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.go('/profile/notifications');
+              },
             ),
             if (ref.read(authProvider).isAdmin)
               ListTile(
@@ -580,6 +618,154 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showOwnItemActions(Item item) async {
+    final itemRepo = ref.read(itemsRepositoryProvider);
+    final matchCount = ref
+        .read(matchingProvider)
+        .matches
+        .where((match) => match.itemAId == item.id || match.itemBId == item.id)
+        .length;
+
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                ListTile(
+                  title: Text(
+                    item.brand,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text('${item.category.apiValue} • ${item.size.label}'),
+                ),
+                FutureBuilder<ItemStats>(
+                  future: itemRepo.getItemStats(item.id),
+                  builder: (context, snapshot) {
+                    final likes = snapshot.data?.likesCount ?? 0;
+                    final total = snapshot.data?.totalMatches ?? matchCount;
+                    final active = snapshot.data?.activeMatches ?? matchCount;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _StatBadge(
+                              icon: Icons.favorite_rounded,
+                              iconColor: Colors.pink,
+                              value: '$likes',
+                              label: 'Likes',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _StatBadge(
+                              icon: Icons.handshake_outlined,
+                              iconColor: Theme.of(context).colorScheme.primary,
+                              value: '$active/$total',
+                              label: 'Active/Total matches',
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit item'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.go('/profile/edit/${item.id}');
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    item.status == ItemStatus.available
+                        ? Icons.sell_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  title: Text(
+                    item.status == ItemStatus.available
+                        ? 'Mark as sold (hide from discover)'
+                        : 'Mark as available (show in discover)',
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final nextStatus = item.status == ItemStatus.available
+                        ? 'swapped'
+                        : 'available';
+                    final ok = await ref
+                        .read(itemsProvider.notifier)
+                        .updateItem(item.id, {'status': nextStatus});
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Item status updated'
+                              : (ref.read(itemsProvider).error ??
+                                  'Could not update item status'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.list_alt_outlined),
+                  title: const Text('View matches on this item'),
+                  subtitle: Text('$matchCount related matches'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.go('/matches');
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  title: Text(
+                    'Delete item',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final ok = await ref
+                        .read(itemsProvider.notifier)
+                        .deleteItem(item.id);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          ok
+                              ? 'Item removed'
+                              : (ref.read(itemsProvider).error ??
+                                  'Could not remove item'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      },
     );
   }
 
@@ -624,45 +810,106 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         final sizeLabel = item.category == ItemCategory.shoes && item.shoeSizeEu != null
           ? 'EU ${item.shoeSizeEu!.toStringAsFixed(0)}'
           : item.size.label;
-        return Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: theme.colorScheme.surfaceContainerHighest,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: item.photos.isNotEmpty
-                    ? Image.network(item.photos.first.url, fit: BoxFit.cover)
-                    : Center(
-                        child: Icon(Icons.checkroom,
-                            size: 40,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withAlpha(100)),
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.brand,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    Text(
-                      '${item.category.apiValue} • $sizeLabel',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+        return GestureDetector(
+          onTap: () => _showOwnItemActions(item),
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: theme.colorScheme.surfaceContainerHighest,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: item.photos.isNotEmpty
+                      ? Stack(
+                          children: [
+                            PageView.builder(
+                              itemCount: item.photos.length,
+                              itemBuilder: (context, index) {
+                                final url = item.photos[index].url;
+                                if (url.isEmpty) {
+                                  return Center(
+                                    child: Icon(Icons.checkroom,
+                                        size: 40,
+                                        color: theme.colorScheme.onSurfaceVariant
+                                            .withAlpha(100)),
+                                  );
+                                }
+                                return Image.network(
+                                  url,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Icon(
+                                      Icons.broken_image_rounded,
+                                      size: 40,
+                                      color: theme.colorScheme.onSurfaceVariant
+                                          .withAlpha(100),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            if (item.photos.length > 1)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(130),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${item.photos.length} photos',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        )
+                      : Center(
+                          child: Icon(Icons.checkroom,
+                              size: 40,
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withAlpha(100)),
+                        ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.brand,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        '${item.category.apiValue} • $sizeLabel',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        item.status.name,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -722,75 +969,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         )),
                   ],
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildWishlistTab(ThemeData theme) {
-    final wishlist = ref.watch(profileProvider).wishlist;
-    if (wishlist.isEmpty) {
-      return _emptyState(
-        theme,
-        icon: Icons.bookmark_outline_rounded,
-        title: 'Wishlist empty',
-        subtitle: 'Add items you\'re looking for',
-        actionLabel: 'Manage Wishlist',
-        onAction: () => context.go('/profile/wishlist'),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemCount: wishlist.length,
-      itemBuilder: (ctx, i) {
-        final entry = wishlist[i];
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: theme.colorScheme.surfaceContainerHighest,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.bookmark_rounded,
-                    color: theme.colorScheme.primary, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(entry.category,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    if (entry.size != null || entry.brand != null)
-                      Text(
-                        [
-                          if (entry.size != null) 'Size: ${entry.size}',
-                          if (entry.brand != null) entry.brand!,
-                        ].join(' • '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: () =>
-                    ref.read(profileProvider.notifier).removeWishlistEntry(entry.id),
               ),
             ],
           ),
@@ -881,17 +1059,23 @@ class _StatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: iconColor, size: 22),
-        const SizedBox(height: 4),
-        Text(value,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        Text(label, style: Theme.of(context).textTheme.labelSmall),
-      ],
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 28),
+          const SizedBox(height: 8),
+          Text(value,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 2),
+          Text(label, style: theme.textTheme.labelSmall),
+        ],
+      ),
     );
   }
 }

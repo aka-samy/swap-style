@@ -40,6 +40,12 @@ export class ItemsController {
     });
   }
 
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get item engagement stats (likes and matches)' })
+  async getItemStats(@Param('id') id: string) {
+    return this.itemsService.getItemStats(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a single item' })
   @ApiResponse({ status: 404, description: 'Item not found' })
@@ -75,5 +81,26 @@ export class ItemsController {
     },
   ) {
     return this.itemsService.verifyItem(id, req.user.userId, body);
+  }
+
+  @Post(':id/photos/upload-url')
+  @ApiOperation({ summary: 'Get presigned upload URL for an item photo' })
+  async getUploadUrl(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: { contentType: string },
+  ) {
+    return this.itemsService.getPresignedUploadUrl(id, req.user.userId, body.contentType);
+  }
+
+  @Delete(':id/photos/:photoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a photo from an item' })
+  async removePhoto(
+    @Param('id') id: string,
+    @Param('photoId') photoId: string,
+    @Req() req: any,
+  ) {
+    await this.itemsService.removePhoto(id, photoId, req.user.userId);
   }
 }

@@ -52,6 +52,11 @@ class ItemsRepository {
     await _client.dio.delete('/items/$id');
   }
 
+  Future<ItemStats> getItemStats(String id) async {
+    final response = await _client.dio.get('/items/$id/stats');
+    return ItemStats.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<PresignedUploadUrl> getUploadUrl(String itemId, String contentType) async {
     final response = await _client.dio.post('/items/$itemId/photos/upload-url', data: {
       'contentType': contentType,
@@ -71,6 +76,10 @@ class ItemsRepository {
       data: bytes,
       options: Options(headers: {'Content-Type': contentType}),
     );
+  }
+
+  Future<void> deletePhoto(String itemId, String photoId) async {
+    await _client.dio.delete('/items/$itemId/photos/$photoId');
   }
 }
 
@@ -113,6 +122,29 @@ class PresignedUploadUrl {
       uploadUrl: json['uploadUrl'],
       publicUrl: json['publicUrl'],
       key: json['key'],
+    );
+  }
+}
+
+class ItemStats {
+  final String itemId;
+  final int likesCount;
+  final int totalMatches;
+  final int activeMatches;
+
+  ItemStats({
+    required this.itemId,
+    required this.likesCount,
+    required this.totalMatches,
+    required this.activeMatches,
+  });
+
+  factory ItemStats.fromJson(Map<String, dynamic> json) {
+    return ItemStats(
+      itemId: json['itemId'] as String,
+      likesCount: (json['likesCount'] as num?)?.toInt() ?? 0,
+      totalMatches: (json['totalMatches'] as num?)?.toInt() ?? 0,
+      activeMatches: (json['activeMatches'] as num?)?.toInt() ?? 0,
     );
   }
 }

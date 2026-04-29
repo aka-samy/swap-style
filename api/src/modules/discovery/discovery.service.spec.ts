@@ -10,8 +10,8 @@ describe('DiscoveryService', () => {
     item: { findMany: jest.fn(), findUnique: jest.fn().mockResolvedValue({ id: 'item-1', ownerId: 'user-2' }) },
     itemPhoto: { findMany: jest.fn().mockResolvedValue([]) },
     itemVerification: { findMany: jest.fn().mockResolvedValue([]) },
-    like: { findFirst: jest.fn(), create: jest.fn() },
-    block: { findMany: jest.fn() },
+    like: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn(), create: jest.fn() },
+    block: { findMany: jest.fn().mockResolvedValue([]) },
     match: { create: jest.fn() },
     $queryRaw: jest.fn(),
   };
@@ -78,6 +78,44 @@ describe('DiscoveryService', () => {
       }) as any;
 
       expect(result.data).toHaveLength(0);
+    });
+
+    it('falls back to Prisma query when raw PostGIS query fails', async () => {
+      mockPrisma.$queryRaw.mockRejectedValue(
+        new Error('function st_dwithin does not exist'),
+      );
+      mockPrisma.item.findMany.mockResolvedValue([
+        {
+          id: 'item-1',
+          ownerId: 'other-user',
+          category: 'Shirt',
+          brand: 'Nike',
+          size: 'M',
+          condition: 'Good',
+          shoeSizeEu: null,
+          latitude: 30.05,
+          longitude: 31.25,
+          status: 'available',
+          createdAt: new Date(),
+          owner: {
+            displayName: 'Jane',
+            profilePhotoUrl: null,
+            emailVerified: true,
+          },
+        },
+      ]);
+
+      const result = (await service.getFeed('user-1', {
+        page: 1,
+        limit: 20,
+        latitude: 30.0,
+        longitude: 31.2,
+        radiusKm: 50,
+      })) as any;
+
+      expect(mockPrisma.item.findMany).toHaveBeenCalled();
+      expect(result.data).toHaveLength(1);
+      expect(result.meta.page).toBe(1);
     });
   });
 

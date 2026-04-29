@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/item.dart';
 import '../providers/items_provider.dart';
@@ -9,14 +10,15 @@ import '../data/items_repository.dart';
 import '../../../core/api/api_client.dart';
 
 final _itemDetailProvider =
-    FutureProvider.family<Item, String>((ref, itemId) async {
+    FutureProvider.autoDispose.family<Item, String>((ref, itemId) async {
   final client = ref.watch(apiClientProvider);
   return ItemsRepository(client).getItem(itemId);
 });
 
 class EditItemScreen extends ConsumerStatefulWidget {
   final String itemId;
-  const EditItemScreen({super.key, required this.itemId});
+  final String? from;
+  const EditItemScreen({super.key, required this.itemId, this.from});
 
   @override
   ConsumerState<EditItemScreen> createState() => _EditItemScreenState();
@@ -34,7 +36,8 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
   bool _isSubmitting = false;
   bool _initialized = false;
   final List<File> _newPhotos = [];
-  List<String> _existingPhotoUrls = [];
+  List<ItemPhoto> _existingPhotos = [];
+  final List<ItemPhoto> _photosToDelete = [];
   final _picker = ImagePicker();
   static const int _maxPhotos = 7;
 
@@ -71,7 +74,7 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
     _size = item.size;
     _shoeSizeEu = item.shoeSizeEu ?? 42;
     _condition = item.condition;
-    _existingPhotoUrls = item.photos.map((p) => p.url).toList();
+    _existingPhotos = item.photos.toList();
   }
 
   @override
@@ -101,7 +104,11 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
     setState(() => _isSubmitting = false);
     if (mounted) {
-      // Upload new photos
+      if (success && _photosToDelete.isNotEmpty) {
+        for (final photo in _photosToDelete) {
+          await ref.read(itemsProvider.notifier).deletePhoto(widget.itemId, photo.id);
+        }
+      }
       if (success && _newPhotos.isNotEmpty) {
         for (final photo in _newPhotos) {
           await ref.read(itemsProvider.notifier).uploadPhoto(widget.itemId, photo);
@@ -112,7 +119,11 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
           const SnackBar(content: Text('Item updated!')),
         );
       }
-      Navigator.of(context).pop();
+      if (widget.from != null) {
+        context.go(widget.from!);
+      } else {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -142,8 +153,28 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
 
     if (confirmed == true) {
       await ref.read(itemsProvider.notifier).deleteItem(widget.itemId);
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        if (widget.from != null) {
+          context.go(widget.from!);
+        } else {
+          Navigator.of(context).pop();
+        }
+      }
     }
+  }
+
+  void _deleteExistingPhoto(ItemPhoto photo) {
+    if (_existingPhotos.length + _newPhotos.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Item must have at least one photo')),
+      );
+      return;
+    }
+    
+    setState(() {
+      _existingPhotos.removeWhere((p) => p.id == photo.id);
+      _photosToDelete.add(photo);
+    });
   }
 
   @override
@@ -166,21 +197,29 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
-    final totalPhotos = _existingPhotoUrls.length + _newPhotos.length;
+    final totalPhotos = _existingPhotos.length + _newPhotos.length;
     if (totalPhotos >= _maxPhotos) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Maximum $_maxPhotos photos allowed')),
       );
       return;
     }
-    final picked = await _picker.pickImage(
-      source: source,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
-    if (picked != null) {
-      setState(() => _newPhotos.add(File(picked.path)));
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        setState(() => _newPhotos.add(File(picked.path)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not select photo: $e')),
+        );
+      }
     }
   }
 
@@ -214,13 +253,14 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Item'),
+        title: const Text('Edit Item', style: TextStyle(fontWeight: FontWeight.w600)),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.delete_outline,
-                color: Theme.of(context).colorScheme.error),
+            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
             onPressed: _delete,
           ),
         ],
@@ -230,51 +270,39 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Photo section
+            // Photos Section
+            Text('Photos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             SizedBox(
               height: 120,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
                   // Existing photos
-                  ..._existingPhotoUrls.map((url) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            url,
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      )),
-                  // New photos
-                  ..._newPhotos.asMap().entries.map((entry) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                  ..._existingPhotos.map((photo) => Padding(
+                        padding: const EdgeInsets.only(right: 12),
                         child: Stack(
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                entry.value,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.network(
+                                photo.url,
                                 width: 120,
                                 height: 120,
                                 fit: BoxFit.cover,
                               ),
                             ),
                             Positioned(
-                              top: 4,
-                              right: 4,
+                              top: 6,
+                              right: 6,
                               child: GestureDetector(
-                                onTap: () => setState(
-                                    () => _newPhotos.removeAt(entry.key)),
+                                onTap: () => _deleteExistingPhoto(photo),
                                 child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(150),
                                     shape: BoxShape.circle,
                                   ),
-                                  padding: const EdgeInsets.all(4),
+                                  padding: const EdgeInsets.all(6),
                                   child: const Icon(Icons.close,
                                       size: 16, color: Colors.white),
                                 ),
@@ -283,31 +311,68 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                           ],
                         ),
                       )),
-                  if (_existingPhotoUrls.length + _newPhotos.length < _maxPhotos)
+                  // New photos
+                  ..._newPhotos.asMap().entries.map((entry) => Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Image.file(
+                                entry.value,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: GestureDetector(
+                                onTap: () => setState(
+                                    () => _newPhotos.removeAt(entry.key)),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(150),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  child: const Icon(Icons.close,
+                                      size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                  if (_existingPhotos.length + _newPhotos.length < _maxPhotos)
                     GestureDetector(
                       onTap: _showPhotoOptions,
                       child: Container(
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
+                          color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                              color: Theme.of(context).colorScheme.outline),
+                            color: theme.colorScheme.outlineVariant,
+                            width: 2,
+                            style: BorderStyle.solid,
+                          ),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_a_photo,
-                                size: 32,
-                                color:
-                                    Theme.of(context).colorScheme.primary),
-                            const SizedBox(height: 4),
+                            Icon(Icons.add_photo_alternate_outlined,
+                                size: 36,
+                                color: theme.colorScheme.primary),
+                            const SizedBox(height: 8),
                             Text(
-                                '${_existingPhotoUrls.length + _newPhotos.length}/$_maxPhotos',
-                                style: Theme.of(context).textTheme.bodySmall),
+                                '${_existingPhotos.length + _newPhotos.length}/$_maxPhotos',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.primary,
+                                )),
                           ],
                         ),
                       ),
@@ -315,103 +380,185 @@ class _EditItemScreenState extends ConsumerState<EditItemScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            DropdownButtonFormField<ItemCategory>(
-              value: _category,
-              decoration: const InputDecoration(labelText: 'Category'),
-              items: ItemCategory.values
-                  .map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c.apiValue),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _category = v;
-                  if (_category == ItemCategory.shoes) {
-                    _size = ItemSize.oneSize;
-                  } else if (_size == ItemSize.oneSize) {
-                    _size = ItemSize.m;
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _brandController,
-              decoration: const InputDecoration(labelText: 'Title'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Title is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            if (_category == ItemCategory.shoes)
-              DropdownButtonFormField<double>(
-                value: _shoeSizeEu,
-                decoration: const InputDecoration(labelText: 'Shoe Size (EU)'),
-                items: _shoeSizesEu
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(s.toStringAsFixed(0)),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _shoeSizeEu = v);
-                },
-              )
-            else
-              DropdownButtonFormField<ItemSize>(
-                value: _size,
-                decoration: const InputDecoration(labelText: 'Size'),
-                items: ItemSize.values
-                    .where((s) => s != ItemSize.oneSize)
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(s.label),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _size = v),
+            // Details Section
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                borderRadius: BorderRadius.circular(24),
               ),
-            const SizedBox(height: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Item Details', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  
+                  TextFormField(
+                    controller: _brandController,
+                    decoration: InputDecoration(
+                      labelText: 'Title / Brand',
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Icon(Icons.label_outline),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  DropdownButtonFormField<ItemCategory>(
+                    value: _category,
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Icon(Icons.category_outlined),
+                    ),
+                    items: ItemCategory.values
+                        .map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c.apiValue),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() {
+                        _category = v;
+                        if (_category == ItemCategory.shoes) {
+                          _size = ItemSize.oneSize;
+                        } else if (_size == ItemSize.oneSize) {
+                          _size = ItemSize.m;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-            DropdownButtonFormField<ItemCondition>(
-              value: _condition,
-              decoration: const InputDecoration(labelText: 'Condition'),
-              items: ItemCondition.values
-                  .map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(c.apiValue),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _condition = v),
-            ),
-            const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _category == ItemCategory.shoes
+                            ? DropdownButtonFormField<double>(
+                                value: _shoeSizeEu,
+                                decoration: InputDecoration(
+                                  labelText: 'Shoe Size (EU)',
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  prefixIcon: const Icon(Icons.straighten),
+                                ),
+                                items: _shoeSizesEu
+                                    .map((s) => DropdownMenuItem(
+                                          value: s,
+                                          child: Text(s.toStringAsFixed(0)),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v == null) return;
+                                  setState(() => _shoeSizeEu = v);
+                                },
+                              )
+                            : DropdownButtonFormField<ItemSize>(
+                                value: _size,
+                                decoration: InputDecoration(
+                                  labelText: 'Size',
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  prefixIcon: const Icon(Icons.straighten),
+                                ),
+                                items: ItemSize.values
+                                    .where((s) => s != ItemSize.oneSize)
+                                    .map((s) => DropdownMenuItem(
+                                          value: s,
+                                          child: Text(s.label),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _size = v),
+                              ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: DropdownButtonFormField<ItemCondition>(
+                          value: _condition,
+                          decoration: InputDecoration(
+                            labelText: 'Condition',
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            prefixIcon: const Icon(Icons.diamond_outlined),
+                          ),
+                          items: ItemCondition.values
+                              .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c.apiValue),
+                                  ))
+                              .toList(),
+                          onChanged: (v) => setState(() => _condition = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-            TextFormField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'Any details about the item...',
+                  TextFormField(
+                    controller: _notesController,
+                    decoration: InputDecoration(
+                      labelText: 'Notes (optional)',
+                      hintText: 'Any details about the item...',
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Icon(Icons.description_outlined),
+                    ),
+                    maxLines: 3,
+                    maxLength: 500,
+                  ),
+                ],
               ),
-              maxLines: 3,
-              maxLength: 500,
             ),
-            const SizedBox(height: 24),
+            
+            const SizedBox(height: 32),
 
             FilledButton(
               onPressed: _isSubmitting ? null : _save,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
               child: _isSubmitting
                   ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Save Changes'),
+                  : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

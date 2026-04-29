@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { MatchStatus } from '@prisma/client';
+import { ChatService } from '../chat/chat.service';
 
 const MATCH_INCLUDE = {
   userA: { select: { id: true, displayName: true, profilePhotoUrl: true, emailVerified: true } },
@@ -20,7 +21,98 @@ export class MatchingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamification: GamificationService,
+    private readonly chatService: ChatService,
   ) {}
+
+  async openChatForItem(userId: string, itemId: string, initialMessage?: string) {
+    const targetItem = await this.prisma.item.findUnique({
+      where: { id: itemId },
+      select: {
+        id: true,
+        brand: true,
+        category: true,
+        status: true,
+        ownerId: true,
+      },
+    });
+
+    if (!targetItem) {
+      throw new NotFoundException('Item not found');
+    }
+
+    if (targetItem.ownerId === userId) {
+      throw new BadRequestException('You cannot start a chat about your own item');
+    }
+
+    if (targetItem.status === 'removed') {
+      throw new BadRequestException('This item is no longer available for chat');
+    }
+
+    const myAvailableItem = await this.prisma.item.findFirst({
+      where: {
+        ownerId: userId,
+        status: 'available',
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (!myAvailableItem) {
+      throw new BadRequestException(
+        'Add at least one available item in your closet before starting a chat.',
+      );
+    }
+
+    const existing = await this.prisma.match.findFirst({
+      where: {
+        OR: [
+          {
+            userAId: userId,
+            userBId: targetItem.ownerId,
+            itemBId: targetItem.id,
+          },
+          {
+            userAId: targetItem.ownerId,
+            userBId: userId,
+            itemAId: targetItem.id,
+          },
+        ],
+        status: {
+          notIn: [MatchStatus.canceled, MatchStatus.expired],
+        },
+      },
+      include: MATCH_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const match =
+      existing ??
+      (await this.prisma.match.create({
+        data: {
+          userAId: userId,
+          userBId: targetItem.ownerId,
+          itemAId: myAvailableItem.id,
+          itemBId: targetItem.id,
+          status: MatchStatus.pending,
+        },
+        include: MATCH_INCLUDE,
+      }));
+
+    const currentMessageCount = await this.prisma.message.count({
+      where: { matchId: match.id },
+    });
+
+    if (currentMessageCount === 0) {
+      const defaultText = `Hi! I am interested in your "${targetItem.brand}" (${targetItem.category}). Is it still available?`;
+      await this.chatService.createMessage(
+        match.id,
+        userId,
+        initialMessage?.trim() || defaultText,
+      );
+    }
+
+    return match;
+  }
 
   async findAll(
     userId: string,

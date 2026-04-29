@@ -1,7 +1,7 @@
 # Mobile Browser Loading Fix - Completed ✅
 
 ## Problem
-Mobile browser was stuck in infinite loading when trying to access `http://192.168.1.131:3000/api`
+Mobile browser was stuck in infinite loading when trying to access `http://192.168.1.131:3001/api`
 
 ## Root Cause
 The `run_local_lan.cmd` script depends on Docker, which was not installed. Backend never started.
@@ -10,7 +10,7 @@ The `run_local_lan.cmd` script depends on Docker, which was not installed. Backe
 Created `run_local_simple.cmd` which uses local PostgreSQL 17 (already installed) instead of Docker.
 
 ## Current Status ✅
-- **Backend API**: Running on 0.0.0.0:3000
+- **Backend API**: Running on 0.0.0.0:3001
 - **PostgreSQL**: Connected and migrated
 - **LAN IP**: 192.168.1.131
 - **API Response**: Confirmed working (tested from LAN IP)
@@ -20,14 +20,14 @@ Created `run_local_simple.cmd` which uses local PostgreSQL 17 (already installed
 ### 1. Phone Browser Test
 From your phone (same Wi-Fi):
 ```
-http://192.168.1.131:3000/api
+http://192.168.1.131:3001/api
 ```
 Should load Swagger documentation (not hang).
 
 ### 2. If Phone Can't Connect
 Run firewall rule as Administrator:
 ```powershell
-netsh advfirewall firewall add rule name="SwapStyle API 3000" dir=in action=allow protocol=TCP localport=3000
+netsh advfirewall firewall add rule name="SwapStyle API 3001" dir=in action=allow protocol=TCP localport=3001
 ```
 
 ### 3. Build Mobile APK

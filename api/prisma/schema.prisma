@@ -10,6 +10,7 @@ datasource db {
 // ─── Enums ──────────────────────────────────────────────
 
 enum ItemCategory {
+  TShirt
   Shirt
   Hoodie
   Pants

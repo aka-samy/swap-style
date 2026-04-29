@@ -9,7 +9,8 @@ import {
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { ItemCategory, ItemSize, ItemCondition } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { ItemCategory, ItemSize, ItemCondition, ItemStatus } from '@prisma/client';
 
 export class CreateItemDto {
   @ApiProperty({ enum: ItemCategory })
@@ -52,16 +53,23 @@ export class CreateItemDto {
   longitude: number;
 }
 
-export class UpdateItemDto extends PartialType(CreateItemDto) {}
+export class UpdateItemDto extends PartialType(CreateItemDto) {
+  @ApiPropertyOptional({ enum: ItemStatus })
+  @IsOptional()
+  @IsEnum(ItemStatus)
+  status?: ItemStatus;
+}
 
 export class PaginationQueryDto {
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   page?: number = 1;
 
   @ApiPropertyOptional({ default: 20 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   limit?: number = 20;
 }

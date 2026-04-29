@@ -30,6 +30,10 @@ export class ChatService {
     return match;
   }
 
+  async ensureParticipant(matchId: string, userId: string) {
+    await this.validateParticipant(matchId, userId);
+  }
+
   async createMessage(matchId: string, senderId: string, text: string) {
     const match = await this.validateParticipant(matchId, senderId);
 
@@ -37,6 +41,10 @@ export class ChatService {
       data: { matchId, senderId, text },
       include: { sender: { select: { id: true, displayName: true, profilePhotoUrl: true } } },
     });
+
+    if (this.server) {
+      this.server.to(`match:${matchId}`).emit('new_message', message);
+    }
 
     // Push notification to the other party
     const recipientId = match.userAId === senderId ? match.userBId : match.userAId;

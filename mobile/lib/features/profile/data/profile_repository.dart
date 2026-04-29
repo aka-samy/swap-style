@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/models/item.dart';
 import '../../../core/models/user.dart';
 
 class ProfileRepository {
@@ -21,6 +22,31 @@ class ProfileRepository {
   Future<User> getPublicProfile(String userId) async {
     final response = await _client.dio.get('/users/$userId');
     return User.fromJson(response.data);
+  }
+
+  Future<List<Item>> getPublicCloset(
+    String userId, {
+    int page = 1,
+    int limit = 40,
+  }) async {
+    final response = await _client.dio.get(
+      '/users/$userId/closet',
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+      },
+    );
+
+    final payload = response.data;
+    final rawList = payload is List
+        ? payload
+        : (payload as Map<String, dynamic>)['data'] as List<dynamic>? ??
+            <dynamic>[];
+
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(Item.fromJson)
+        .toList();
   }
 
   Future<String> uploadProfilePhoto(String filePath) async {

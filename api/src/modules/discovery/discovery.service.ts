@@ -18,17 +18,6 @@ export class DiscoveryService {
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
-  private isPostgisUnavailable(error: unknown): boolean {
-    const message =
-      error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-
-    return (
-      message.includes('st_distance') ||
-      message.includes('st_dwithin') ||
-      (message.includes('function') && message.includes('does not exist'))
-    );
-  }
-
   private haversineKm(
     latitude1: number,
     longitude1: number,
@@ -220,9 +209,10 @@ export class DiscoveryService {
         LIMIT ${limit} OFFSET ${offset}
       `;
     } catch (error) {
-      if (!this.isPostgisUnavailable(error)) {
-        throw error;
-      }
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Discovery feed raw query failed, using fallback distance query: ${message}`,
+      );
 
       items = await this.getFeedWithoutPostgis(userId, {
         page,
@@ -262,7 +252,10 @@ export class DiscoveryService {
 
     const photosByItem = photos.reduce(
       (acc, p) => {
-        (acc[p.itemId] ||= []).push({ url: p.url, thumbnailUrl: p.url });
+        (acc[p.itemId] ||= []).push({
+          url: p.url,
+          thumbnailUrl: p.thumbnailUrl,
+        });
         return acc;
       },
       {} as Record<string, any[]>,

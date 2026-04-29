@@ -50,6 +50,7 @@ Map<String, dynamic> _$$ItemImplToJson(_$ItemImpl instance) =>
     };
 
 const _$ItemCategoryEnumMap = {
+  ItemCategory.tShirt: 'TShirt',
   ItemCategory.shirt: 'Shirt',
   ItemCategory.hoodie: 'Hoodie',
   ItemCategory.pants: 'Pants',

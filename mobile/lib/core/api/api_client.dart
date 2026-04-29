@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -10,12 +13,17 @@ class ApiClient {
   late final Dio _dio;
 
   ApiClient() {
+    final baseUrl = _resolveBaseUrl(
+      const String.fromEnvironment('API_BASE_URL', defaultValue: ''),
+    );
+
+    if (kDebugMode) {
+      debugPrint('ApiClient baseUrl: $baseUrl');
+    }
+
     _dio = Dio(
       BaseOptions(
-        baseUrl: const String.fromEnvironment(
-          'API_BASE_URL',
-          defaultValue: 'https://swap-style-production.up.railway.app/api/v1',
-        ),
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
@@ -49,6 +57,65 @@ class ApiClient {
   void clearAuthToken() {
     _authToken = null;
     _dio.options.headers.remove('Authorization');
+  }
+
+  static String _resolveBaseUrl(String configured) {
+    final configuredBaseUrl = configured.trim();
+
+    if (configuredBaseUrl.isNotEmpty) {
+      final parsed = Uri.tryParse(configuredBaseUrl);
+      if (parsed != null && parsed.hasScheme && parsed.host.isNotEmpty) {
+        if (parsed.port == 3000 && _isLikelyLocalHost(parsed.host)) {
+          // Local backend moved to 3001; auto-correct stale local dart-defines.
+          return parsed.replace(port: 3001).toString();
+        }
+        return configuredBaseUrl;
+      }
+    }
+
+    return _defaultBaseUrl();
+  }
+
+  static String _defaultBaseUrl() {
+    if (kReleaseMode) {
+      return 'https://swap-style-production.up.railway.app/api/v1';
+    }
+
+    if (Platform.isAndroid) {
+      // Using physical network IP so physical devices can reach the local server
+      return 'http://192.168.1.166:3001/api/v1';
+    }
+
+    if (Platform.isIOS) {
+      // Using physical network IP so physical devices can reach the local server
+      return 'http://192.168.1.166:3001/api/v1';
+    }
+
+    return 'http://localhost:3001/api/v1';
+  }
+
+  static bool _isLikelyLocalHost(String host) {
+    final normalized = host.toLowerCase();
+    if (normalized == 'localhost' ||
+        normalized == '127.0.0.1' ||
+        normalized == '::1' ||
+        normalized == '10.0.2.2') {
+      return true;
+    }
+
+    final match = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
+        .firstMatch(normalized);
+    if (match == null) return false;
+
+    final first = int.tryParse(match.group(1)!);
+    final second = int.tryParse(match.group(2)!);
+    if (first == null || second == null) return false;
+
+    if (first == 10) return true;
+    if (first == 192 && second == 168) return true;
+    if (first == 172 && second >= 16 && second <= 31) return true;
+
+    return false;
   }
 
   /// Refresh the Firebase ID token and update the header

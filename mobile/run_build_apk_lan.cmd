@@ -13,7 +13,7 @@ if "%LAN_IP%"=="" (
 )
 
 echo Detected LAN IP: %LAN_IP%
-set "API_BASE_URL=http://%LAN_IP%:3000/api/v1"
+set "API_BASE_URL=http://%LAN_IP%:3001/api/v1"
 echo Building APK with API_BASE_URL=%API_BASE_URL%
 call C:\swapstyle\mobile\run_build_apk.cmd %API_BASE_URL%
 

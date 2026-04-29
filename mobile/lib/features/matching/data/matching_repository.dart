@@ -35,6 +35,18 @@ class MatchingRepository {
     final response = await _client.dio.post('/matches/$id/cancel');
     return Match.fromJson(response.data);
   }
+
+  Future<Match> openChatForItem(
+    String itemId, {
+    String? initialMessage,
+  }) async {
+    final response = await _client.dio.post('/matches/open-chat', data: {
+      'itemId': itemId,
+      if (initialMessage != null && initialMessage.trim().isNotEmpty)
+        'initialMessage': initialMessage.trim(),
+    });
+    return Match.fromJson(response.data);
+  }
 }
 
 class PaginatedMatches {

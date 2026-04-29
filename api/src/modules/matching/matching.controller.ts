@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
@@ -9,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { MatchingService } from './matching.service';
-import { MatchQueryDto } from './dto';
+import { MatchQueryDto, OpenChatMatchDto } from './dto';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
 
 @ApiTags('Matches')
@@ -27,6 +28,16 @@ export class MatchingController {
       limit: query.limit ?? 20,
       status: query.status,
     });
+  }
+
+  @Post('open-chat')
+  @ApiOperation({ summary: 'Create or open a chat for a specific item' })
+  async openChat(@Req() req: any, @Body() dto: OpenChatMatchDto) {
+    return this.matchingService.openChatForItem(
+      req.user.userId,
+      dto.itemId,
+      dto.initialMessage,
+    );
   }
 
   @Get(':id')

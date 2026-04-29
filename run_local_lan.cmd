@@ -8,7 +8,7 @@ if "%LAN_IP%"=="" set "LAN_IP=127.0.0.1"
 
 echo ===========================================
 echo SwapStyle local LAN mode
-echo API URL for devices: http://%LAN_IP%:3000/api/v1
+echo API URL for devices: http://%LAN_IP%:3001/api/v1
 echo ===========================================
 
 cd /d %ROOT%
@@ -26,7 +26,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Starting API on 0.0.0.0:3000...
+echo Starting API on 0.0.0.0:3001...
 npm run start:dev
 
 endlocal

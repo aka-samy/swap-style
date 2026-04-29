@@ -8,7 +8,7 @@ If Docker and WSL2 are not available, follow this guide to set up locally.
 
 - Node.js 18+ (already have npm working)
 - PostgreSQL 16.x local installation
-- Redis 7+ (optional, can mock in tests)
+- Redis 7+ compatible runtime (required when BullMQ workers are enabled)
 - Dart/Flutter SDK (already installed)
 
 ---
@@ -73,7 +73,9 @@ File: `api/.env`
 ```
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/swapstyle?schema=public
 REDIS_HOST=localhost
-REDIS_PORT=6379
+REDIS_PORT=6380
+PORT=3001
+ENABLE_BULLMQ_WORKERS=true
 ```
 
 If PostgreSQL is on **different port** or **different user**, update DATABASE_URL accordingly.
@@ -129,32 +131,40 @@ winget install Memurai.Memurai
 ```
 
 If winget fails:
-1. Visit https://github.com/microsoftarchive/redis/releases
-2. Download latest `Redis-x64-*.msi`
-3. Run installer (default port 6379)
-4. Test: `redis-cli ping` → Should respond `PONG`
+1. Download Memurai installer and extract/runtime files locally.
+2. Ensure `memurai.exe` and `memurai-cli.exe` are available under one of these paths:
+   - `Memurai-Developer-v4.1.2/SourceDir/Memurai`
+   - `tools/memurai/extracted/SourceDir/Memurai`
+3. Start Memurai on port `6380`:
+   ```powershell
+   .\Memurai-Developer-v4.1.2\SourceDir\Memurai\memurai.exe --port 6380
+   ```
+4. Test:
+   ```powershell
+   .\Memurai-Developer-v4.1.2\SourceDir\Memurai\memurai-cli.exe -p 6380 ping
+   ```
+   Expected output: `PONG`
 
 ### Option B: Skip Redis (Tests Mock It)
 
-Redis is optional. Tests use mocks. Leave `REDIS_HOST=localhost` in `.env`.
+For local development with workers enabled, Redis compatibility is required.
 
 ---
 
 ## Step 8: Start Backend Server
 
 ```powershell
-cd C:\swapstyle\api
-
-# Development mode with auto-reload
-npm run start:dev
-
-# Should see:
-# ✓ NestJS application successfully started
-# ✓ Listening on port 3000
-# ✓ Swagger available at http://localhost:3000/api
+cd C:\swapstyle
+run_local_simple.cmd
 ```
 
-Visit: http://localhost:3000/api (Swagger UI)
+This script will:
+- Verify PostgreSQL and create DB/extension if needed
+- Ensure Memurai is running on `6380`
+- Run `prisma migrate deploy`
+- Start NestJS on `3001`
+
+Visit: http://localhost:3001/api (Swagger UI)
 
 ---
 
@@ -205,12 +215,12 @@ Error: Client generation failed
 
 ### Port Already in Use
 ```
-Error: EADDRINUSE :::3000
+Error: EADDRINUSE :::3001
 ```
 **Fix**:
 ```powershell
-# Find process on port 3000
-netstat -ano | findstr :3000
+# Find process on port 3001
+netstat -ano | findstr :3001
 
 # Kill it
 taskkill /PID <PID> /F
@@ -218,7 +228,7 @@ taskkill /PID <PID> /F
 
 Or change port in `api/.env`:
 ```
-PORT=3001
+PORT=3002
 ```
 
 ---
@@ -229,10 +239,10 @@ PORT=3001
 - [ ] Database created (`\l` in psql shows "swapstyle")
 - [ ] PostGIS installed (`SELECT postgis_version();`)
 - [ ] Migrations applied (`npx prisma migrate status` shows all applied)
-- [ ] Node server running on http://localhost:3000
+- [ ] Node server running on http://localhost:3001
 - [ ] Swagger docs accessible
 - [ ] npm tests pass (`npm test` → 69/69)
-- [ ] Redis running (if using) (`redis-cli ping` → PONG)
+- [ ] Redis-compatible runtime running on 6380 (`memurai-cli -p 6380 ping` -> PONG)
 
 ---
 

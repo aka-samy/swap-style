@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/message.dart';
 import '../data/chat_repository.dart';
@@ -75,11 +76,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   Future<void> send(String text) async {
     try {
-      _repository.sendMessageViaSocket(matchId, text);
-    } catch (e) {
-      // fallback to REST
       final message = await _repository.sendMessage(matchId, text);
       state = state.copyWith(messages: [message, ...state.messages]);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
     }
   }
 
@@ -91,16 +91,44 @@ class ChatNotifier extends StateNotifier<ChatState> {
     await _repository.markRead(matchId).catchError((_) {});
   }
 
-  void joinRoom() {
-    // Connect socket with auth token
-    final token = _apiClient.authToken;
-    if (token != null) {
-      _repository.connect(_apiClient.serverUrl, token);
-      _repository.onNewMessage(_handleNewMessage);
-      _repository.onTyping(_handleTyping);
+  Future<void> joinRoom() async {
+    state = state.copyWith(isConnected: false, error: null);
+
+    var token = _apiClient.authToken;
+    if (token == null || token.isEmpty) {
+      token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (token != null && token.isNotEmpty) {
+        _apiClient.setAuthToken(token);
+      }
     }
-    _repository.joinMatch(matchId);
-    state = state.copyWith(isConnected: true);
+
+    if (token == null || token.isEmpty) {
+      state = state.copyWith(
+        isConnected: false,
+        error: 'Realtime chat unavailable: authentication token missing.',
+      );
+      return;
+    }
+
+    _repository.connect(_apiClient.serverUrl, token);
+    _repository.onNewMessage(_handleNewMessage);
+    _repository.onTyping(_handleTyping);
+
+    _repository.onConnected(() {
+      state = state.copyWith(isConnected: true, error: null);
+      _repository.joinMatch(matchId);
+    });
+
+    _repository.onDisconnected((_) {
+      state = state.copyWith(isConnected: false);
+    });
+
+    _repository.onConnectionError((message) {
+      state = state.copyWith(
+        isConnected: false,
+        error: 'Realtime chat unavailable. Messages still work over REST.',
+      );
+    });
   }
 
   @override
