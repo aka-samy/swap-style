@@ -1,3 +1,4 @@
+/* eslint-env jest */
 import { Test, TestingModule } from '@nestjs/testing';
 import { CounterOffersService } from './counter-offers.service';
 import { PrismaService } from '../../common/prisma/prisma.service';

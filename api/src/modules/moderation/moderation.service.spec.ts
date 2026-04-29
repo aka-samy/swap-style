@@ -1,3 +1,4 @@
+/* eslint-env jest */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ModerationService } from './moderation.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
