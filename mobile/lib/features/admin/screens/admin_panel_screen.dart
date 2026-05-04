@@ -205,15 +205,25 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen> {
               icon: const Icon(Icons.refresh_rounded),
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Dashboard'),
-              Tab(text: 'Users'),
-              Tab(text: 'Reports'),
-              Tab(text: 'Items'),
-              Tab(text: 'Matches'),
-              Tab(text: 'Monitor'),
+              const Tab(text: 'Dashboard'),
+              const Tab(text: 'Users'),
+              Tab(
+                child: Row(
+                  children: [
+                    const Text('Reports'),
+                    if (_reports.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.error_rounded, size: 16, color: theme.colorScheme.error),
+                    ],
+                  ],
+                ),
+              ),
+              const Tab(text: 'Items'),
+              const Tab(text: 'Matches'),
+              const Tab(text: 'Monitor'),
             ],
           ),
         ),

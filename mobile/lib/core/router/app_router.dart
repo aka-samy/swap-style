@@ -15,6 +15,7 @@ import '../../features/discovery/screens/discovery_screen.dart';
 import '../../features/matching/screens/match_list_screen.dart';
 import '../../features/items/screens/closet_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/profile/screens/liked_items_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 
 // Detail screens
@@ -27,12 +28,25 @@ import '../../features/profile/screens/public_profile_screen.dart';
 import '../../features/gamification/screens/gamification_screen.dart';
 import '../../features/admin/screens/admin_panel_screen.dart';
 
+class GoRouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  GoRouterNotifier(this._ref) {
+    _ref.listen(
+      authProvider,
+      (_, __) => notifyListeners(),
+    );
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final notifier = GoRouterNotifier(ref);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: notifier,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final isAuth = authState.status == AuthStatus.authenticated;
       final isBooting = authState.status == AuthStatus.initial;
       final isAuthRoute = state.matchedLocation == '/sign-in' ||
@@ -152,6 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'achievements',
                     builder: (context, state) =>
                         const GamificationScreen(),
+                  ),
+                  GoRoute(
+                    path: 'liked',
+                    builder: (context, state) => const LikedItemsScreen(),
                   ),
                   GoRoute(
                     path: 'user/:userId',

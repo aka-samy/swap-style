@@ -5,6 +5,8 @@ import '../../../core/api/api_client.dart';
 import '../../../core/models/item.dart';
 import '../../../core/models/user.dart';
 import '../data/profile_repository.dart';
+import '../providers/profile_provider.dart';
+import 'report_user_sheet.dart';
 import '../../items/data/items_repository.dart';
 import '../../items/providers/items_provider.dart';
 import '../../matching/providers/matching_provider.dart';
@@ -21,9 +23,20 @@ final _publicClosetProvider =
   return ProfileRepository(client).getPublicCloset(userId);
 });
 
-class PublicProfileScreen extends ConsumerWidget {
+final _blocksProvider = FutureProvider<List<String>>((ref) async {
+  return ref.watch(profileRepositoryProvider).getBlocks();
+});
+
+class PublicProfileScreen extends ConsumerStatefulWidget {
   final String userId;
   const PublicProfileScreen({super.key, required this.userId});
+
+  @override
+  ConsumerState<PublicProfileScreen> createState() => _PublicProfileScreenState();
+}
+
+class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
+  bool _isTogglingBlock = false;
 
   Future<void> _openChatAboutItem(
     BuildContext context,
@@ -219,30 +232,57 @@ class PublicProfileScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final profileAsync = ref.watch(_publicProfileProvider(userId));
-    final closetAsync = ref.watch(_publicClosetProvider(userId));
+    final profileAsync = ref.watch(_publicProfileProvider(widget.userId));
+    final closetAsync = ref.watch(_publicClosetProvider(widget.userId));
+    final blocksAsync = ref.watch(_blocksProvider);
+    
+    final isBlocked = blocksAsync.valueOrNull?.contains(widget.userId) ?? false;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
           PopupMenuButton<String>(
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'report') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Report submitted')),
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => ReportUserSheet(targetUserId: widget.userId),
                 );
-              } else if (value == 'block') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('User blocked')),
-                );
+              } else if (value == 'block_toggle') {
+                setState(() => _isTogglingBlock = true);
+                try {
+                  if (isBlocked) {
+                    await ref.read(profileRepositoryProvider).unblockUser(widget.userId);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unblocked')));
+                    }
+                  } else {
+                    await ref.read(profileRepositoryProvider).blockUser(widget.userId);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User blocked')));
+                    }
+                  }
+                  ref.invalidate(_blocksProvider);
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action failed')));
+                  }
+                } finally {
+                  if (mounted) setState(() => _isTogglingBlock = false);
+                }
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'report', child: Text('Report')),
-              const PopupMenuItem(value: 'block', child: Text('Block')),
+              const PopupMenuItem(value: 'report', child: Text('Report User')),
+              PopupMenuItem(
+                value: 'block_toggle',
+                enabled: !_isTogglingBlock,
+                child: Text(isBlocked ? 'Unblock User' : 'Block User'),
+              ),
             ],
           ),
         ],
@@ -271,6 +311,39 @@ class PublicProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text(user.displayName,
                       style: theme.textTheme.headlineSmall),
+                  if (isBlocked) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'You blocked this user',
+                        style: TextStyle(
+                          color: theme.colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonal(
+                      onPressed: _isTogglingBlock ? null : () async {
+                        setState(() => _isTogglingBlock = true);
+                        try {
+                          await ref.read(profileRepositoryProvider).unblockUser(widget.userId);
+                          ref.invalidate(_blocksProvider);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unblocked')));
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isTogglingBlock = false);
+                        }
+                      },
+                      child: const Text('Unblock User'),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -301,6 +374,18 @@ class PublicProfileScreen extends ConsumerWidget {
                 ),
               ),
               data: (items) {
+                if (isBlocked) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text(
+                        'You cannot view the closet of a blocked user.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  );
+                }
+
                 if (items.isEmpty) {
                   return const Center(child: Text('No public items yet'));
                 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
@@ -62,16 +63,35 @@ class ProfileRepository {
 
     // 2. Upload file to presigned URL
     final bytes = await file.readAsBytes();
-    await Dio().put(
-      uploadUrl,
-      data: bytes,
-      options: Options(
-        headers: {
-          'Content-Type': contentType,
-          'Content-Length': bytes.length,
-        },
-      ),
-    );
+    final isLocalUpload = uploadUrl.contains('192.168.1.50') || uploadUrl.contains('localhost');
+    
+    if (isLocalUpload) {
+      // Local server - use JSON with base64
+      final base64Encoded = base64Encode(bytes);
+      await Dio().post(
+        uploadUrl.replaceAll('/upload-url', '/upload-simple'),
+        data: {'imageData': base64Encoded, 'contentType': contentType},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+    } else {
+      // R2 presigned URL - use PUT
+      await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      ).put(
+        uploadUrl,
+        data: bytes,
+        options: Options(
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': bytes.length,
+          },
+        ),
+      );
+    }
 
     // 3. Update profile with new photo URL
     await _client.dio.patch('/users/me', data: {'profilePhotoUrl': publicUrl});
@@ -92,5 +112,27 @@ class ProfileRepository {
 
   Future<void> removeWishlistEntry(String id) async {
     await _client.dio.delete('/users/me/wishlist/$id');
+  }
+
+  Future<void> reportUser(String userId, String reason, String? details) async {
+    await _client.dio.post('/users/$userId/report', data: {
+      'targetUserId': userId,
+      'reason': reason,
+      if (details != null && details.trim().isNotEmpty) 'details': details.trim(),
+    });
+  }
+
+  Future<void> blockUser(String userId) async {
+    await _client.dio.post('/users/$userId/block');
+  }
+
+  Future<void> unblockUser(String userId) async {
+    await _client.dio.delete('/users/$userId/block');
+  }
+
+  Future<List<String>> getBlocks() async {
+    final response = await _client.dio.get('/users/blocks');
+    final rawList = response.data as List;
+    return rawList.map((e) => e['blockedId'].toString()).toList();
   }
 }

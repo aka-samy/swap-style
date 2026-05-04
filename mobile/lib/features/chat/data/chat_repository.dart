@@ -31,6 +31,15 @@ class ChatRepository {
     return Message.fromJson(response.data);
   }
 
+  Future<Message?> getLastMessage(String matchId) async {
+    final response = await _client.dio.get(
+      '/matches/$matchId/messages',
+      queryParameters: {'limit': 1},
+    );
+    final list = (response.data as List).map((e) => Message.fromJson(e)).toList();
+    return list.isNotEmpty ? list.first : null;
+  }
+
   Future<void> markRead(String matchId) async {
     await _client.dio.patch('/matches/$matchId/messages/read');
   }

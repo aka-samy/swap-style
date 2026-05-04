@@ -14,7 +14,7 @@ class CounterOffersRepository {
     final response = await _client.dio.post(
       '/matches/$matchId/counter-offers',
       data: {
-        'additionalItemIds': additionalItemIds,
+        'items': additionalItemIds.map((id) => {'itemId': id}).toList(),
         'monetaryAmount': monetaryAmount,
         if (message != null) 'message': message,
       },

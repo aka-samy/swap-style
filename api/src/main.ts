@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import * as admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
+import { json, urlencoded } from 'express';
 
 function initFirebase() {
   if (admin.apps.length > 0) return;
@@ -42,7 +43,10 @@ function initFirebase() {
 
 async function bootstrap() {
   initFirebase();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { 
+    bodyParser: true,
+    rawBody: true,
+  });
   const isDev = process.env.NODE_ENV !== 'production';
 
   // Security headers
@@ -59,6 +63,9 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api/v1');
+
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   app.useGlobalFilters(new HttpExceptionFilter());
 

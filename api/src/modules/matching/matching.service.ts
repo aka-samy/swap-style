@@ -147,7 +147,7 @@ export class MatchingService {
       where: { id: matchId },
       include: {
         ...MATCH_INCLUDE,
-        counterOffers: {
+counterOffers: {
           orderBy: { createdAt: 'desc' },
           take: 10,
         },
@@ -192,6 +192,8 @@ export class MatchingService {
         await Promise.all([
           this.gamification.recordActivity(match.userAId),
           this.gamification.recordActivity(match.userBId),
+          this.prisma.item.update({ where: { id: match.itemAId }, data: { status: 'swapped' } }),
+          this.prisma.item.update({ where: { id: match.itemBId }, data: { status: 'swapped' } }),
         ]);
       }
       return result;

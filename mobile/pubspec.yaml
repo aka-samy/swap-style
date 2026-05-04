@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # State management
   flutter_riverpod: ^2.6.0
@@ -40,9 +42,12 @@ dependencies:
   json_annotation: ^4.9.0
 
   # Utils
-  intl: ^0.19.0
+  intl: ^0.20.2
   geolocator: ^13.0.0
   shared_preferences: ^2.3.0
+  google_fonts: ^8.1.0
+  flutter_launcher_icons: ^0.14.4
+  firebase_crashlytics: ^4.3.10
 
 dev_dependencies:
   flutter_test:
@@ -58,3 +63,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+  adaptive_icon_background: "#090A0F"
+  adaptive_icon_foreground: "assets/icon.png"

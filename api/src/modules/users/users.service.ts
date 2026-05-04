@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { StorageService } from '../../common/storage/storage.service';
+import { LocalStorageService } from '../../common/storage/local-storage.service';
 import { UpdateProfileDto, CreateWishlistEntryDto } from './dto';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
+    private readonly storage: LocalStorageService,
   ) {}
 
   async getProfile(userId: string) {

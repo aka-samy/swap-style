@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/item.dart';
@@ -38,6 +39,14 @@ class ItemsRepository {
     return PaginatedItems.fromJson(response.data);
   }
 
+  Future<PaginatedItems> getLikedItems({int page = 1, int limit = 20}) async {
+    final response = await _client.dio.get('/items/liked', queryParameters: {
+      'page': page,
+      'limit': limit,
+    });
+    return PaginatedItems.fromJson(response.data);
+  }
+
   Future<Item> getItem(String id) async {
     final response = await _client.dio.get('/items/$id');
     return Item.fromJson(response.data);
@@ -65,17 +74,38 @@ class ItemsRepository {
   }
 
   Future<void> uploadPhoto(String uploadUrl, List<int> bytes, String contentType) async {
-    await Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      ),
-    ).put(
-      uploadUrl,
-      data: bytes,
-      options: Options(headers: {'Content-Type': contentType}),
-    );
+    final isLocalUpload = uploadUrl.contains('upload-simple') || uploadUrl.contains('192.168.') || uploadUrl.contains('localhost') || uploadUrl.contains('10.0.2.2');
+    
+    if (isLocalUpload) {
+      // Local server - use JSON with base64
+      final base64Encoded = base64Encode(bytes);
+      
+      // Extract just the path to ensure it uses Dio's configured baseUrl (handling 10.0.2.2 correctly)
+      String path = uploadUrl;
+      if (uploadUrl.contains('/api/v1')) {
+        path = uploadUrl.substring(uploadUrl.indexOf('/api/v1') + 7);
+      }
+      path = path.replaceAll('/upload-url', '/upload-simple');
+
+      await _client.dio.post(
+        path,
+        data: {'imageData': base64Encoded, 'contentType': contentType},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+    } else {
+      // R2 presigned URL - use PUT
+      await Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      ).put(
+        uploadUrl,
+        data: bytes,
+        options: Options(headers: {'Content-Type': contentType}),
+      );
+    }
   }
 
   Future<void> deletePhoto(String itemId, String photoId) async {

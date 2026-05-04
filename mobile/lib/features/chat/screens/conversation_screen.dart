@@ -52,41 +52,51 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         final theme = Theme.of(sheetContext);
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Match Status',
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(
-                    match == null
-                        ? 'Loading status...'
-                        : _statusLabel(match.status),
-                    style: theme.textTheme.bodyMedium,
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_rounded, color: theme.colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          match == null
+                              ? 'Loading status...'
+                              : _statusLabel(match.status),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.tonalIcon(
+                  child: FilledButton.icon(
                     onPressed: () {
                       Navigator.of(sheetContext).pop();
-                      context.go('/matches/${widget.matchId}');
+                      context.push('/matches/${widget.matchId}');
                     },
                     icon: const Icon(Icons.open_in_new_rounded),
-                    label: const Text('Open Match Details'),
+                    label: const Text('View Match Details'),
                   ),
                 ),
               ],
@@ -141,54 +151,79 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final typingUsers = state.typingUsers;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Premium Header
             Container(
-              padding: const EdgeInsets.fromLTRB(4, 4, 12, 8),
+              padding: const EdgeInsets.fromLTRB(12, 12, 16, 16),
               decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(60),
+                color: theme.scaffoldBackgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withAlpha(5),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
-                ),
+                ],
               ),
               child: Row(
                 children: [
                   IconButton(
-                    tooltip: 'Back to chats',
-                    onPressed: () => context.go('/chats'),
-                    icon: const Icon(Icons.arrow_back_rounded),
+                    tooltip: 'Back',
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/chats');
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    style: IconButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Chat',
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        Text('Conversation',
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(
-                              width: 7,
-                              height: 7,
+                              width: 8,
+                              height: 8,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: state.isConnected
-                                    ? Colors.green
-                                    : (state.error == null ? Colors.orange : Colors.red),
+                                    ? Colors.greenAccent.shade400
+                                    : (state.error == null ? Colors.amber : Colors.redAccent),
+                                boxShadow: [
+                                  if (state.isConnected)
+                                    BoxShadow(
+                                      color: Colors.greenAccent.withAlpha(100),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    )
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 6),
                             Text(
                               state.isConnected
-                                  ? 'Connected'
+                                  ? 'Connected securely'
                                   : (state.error == null
                                       ? 'Connecting...'
                                       : 'Realtime unavailable'),
-                              style: theme.textTheme.labelSmall?.copyWith(
+                              style: theme.textTheme.labelMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -197,21 +232,21 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Match status',
+                    tooltip: 'Match Details',
                     onPressed: () => _showMatchStatusSheet(loadedMatch),
-                    icon: const Icon(Icons.info_outline_rounded),
+                    icon: const Icon(Icons.more_horiz_rounded),
                     style: IconButton.styleFrom(
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ],
               ),
             ),
-            // Messages list
+            // Messages List
             Expanded(
               child: isLoading && messages.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
                   : messages.isEmpty
                       ? Center(
                           child: Padding(
@@ -219,19 +254,25 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.chat_bubble_outline_rounded,
-                                    size: 48,
-                                    color: theme.colorScheme.onSurfaceVariant
-                                        .withAlpha(80)),
-                                const SizedBox(height: 12),
-                                Text('No messages yet',
-                                    style: theme.textTheme.titleSmall),
-                                const SizedBox(height: 4),
-                                Text('Say hello to get started!',
-                                    style:
-                                        theme.textTheme.bodySmall?.copyWith(
-                                      color: theme
-                                          .colorScheme.onSurfaceVariant,
+                                Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(150),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.chat_rounded,
+                                      size: 48,
+                                      color: theme.colorScheme.primary.withAlpha(150)),
+                                ),
+                                const SizedBox(height: 24),
+                                Text('Start the conversation',
+                                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 8),
+                                Text('Send a message to discuss your swap details safely.',
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      height: 1.5,
                                     )),
                               ],
                             ),
@@ -241,7 +282,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                           reverse: true,
                           controller: _scrollController,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
+                              horizontal: 16, vertical: 16),
                           itemCount: messages.length,
                           itemBuilder: (ctx, i) {
                             final msg = messages[i];
@@ -258,85 +299,109 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                         ),
             ),
 
-            // Typing indicator
+            // Typing Indicator
             if (typingUsers.isNotEmpty)
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 alignment: Alignment.centerLeft,
                 child: Row(
                   children: [
                     _TypingDots(),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text('Typing...',
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
                         )),
                   ],
                 ),
               ),
 
-            // Input bar
+            // Floating Input Bar
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(60),
-                  ),
-                ),
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              color: theme.scaffoldBackgroundColor,
               child: SafeArea(
                 top: false,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _inputController,
-                        onChanged: _onTextChanged,
-                        onSubmitted: (_) => _send(),
-                        maxLines: null,
-                        maxLength: 2000,
-                        buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
-                        decoration: InputDecoration(
-                          hintText: 'Message...',
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 10),
-                          filled: true,
-                          fillColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide.none,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.shadowColor.withAlpha(10),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _inputController,
+                          onChanged: _onTextChanged,
+                          onSubmitted: (_) => _send(),
+                          maxLines: 5,
+                          minLines: 1,
+                          textInputAction: TextInputAction.send,
+                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: _isTyping
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        tooltip: 'Send message',
-                        onPressed: _send,
-                        icon: Icon(
-                          Icons.arrow_upward_rounded,
-                          color: _isTyping
-                              ? theme.colorScheme.onPrimary
-                              : theme.colorScheme.onSurfaceVariant,
-                          size: 20,
+                      Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: _isTyping
+                                ? LinearGradient(
+                                    colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: !_isTyping ? theme.colorScheme.surface : null,
+                            shape: BoxShape.circle,
+                            boxShadow: _isTyping
+                                ? [
+                                    BoxShadow(
+                                      color: theme.colorScheme.primary.withAlpha(80),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: IconButton(
+                            tooltip: 'Send',
+                            onPressed: _send,
+                            icon: Icon(
+                              Icons.send_rounded,
+                              color: _isTyping
+                                  ? Colors.white
+                                  : theme.colorScheme.onSurfaceVariant,
+                              size: 20,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -384,12 +449,12 @@ class _TypingDotsState extends State<_TypingDots>
           return Container(
             width: 6,
             height: 6,
-            margin: const EdgeInsets.symmetric(horizontal: 1),
+            margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Theme.of(context)
                   .colorScheme
-                  .onSurfaceVariant
+                  .primary
                   .withAlpha((opacity * 255).toInt()),
             ),
           );
@@ -422,8 +487,8 @@ class _MessageBubble extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(
-        top: showAvatar ? 6 : 1,
-        bottom: 1,
+        top: showAvatar ? 12 : 2,
+        bottom: 2,
       ),
       child: Row(
         mainAxisAlignment:
@@ -431,37 +496,63 @@ class _MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe && showAvatar)
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: theme.colorScheme.primary.withAlpha(25),
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withAlpha(200),
+                    theme.colorScheme.secondary.withAlpha(200),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
               child: Text(
                 _safeInitial(message.sender?.displayName),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.primary,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             )
           else if (!isMe)
-            const SizedBox(width: 28),
-          const SizedBox(width: 6),
+            const SizedBox(width: 36),
           Flexible(
             child: Container(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.72),
+                  maxWidth: MediaQuery.of(context).size.width * 0.75),
               decoration: BoxDecoration(
                 color: isMe
                     ? theme.colorScheme.primary
                     : theme.colorScheme.surfaceContainerHighest,
+                gradient: isMe
+                    ? LinearGradient(
+                        colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(isMe ? 18 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 18),
+                  topLeft: const Radius.circular(20),
+                  topRight: const Radius.circular(20),
+                  bottomLeft: Radius.circular(isMe ? 20 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 20),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isMe ? theme.colorScheme.primary : theme.shadowColor).withAlpha(15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment:
@@ -469,11 +560,12 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   Text(
                     message.text,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isMe ? theme.colorScheme.onPrimary : null,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isMe ? Colors.white : theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -481,20 +573,20 @@ class _MessageBubble extends StatelessWidget {
                         _formatTime(message.createdAt),
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontSize: 10,
+                          fontWeight: FontWeight.w600,
                           color: isMe
-                              ? theme.colorScheme.onPrimary.withAlpha(160)
+                              ? Colors.white.withAlpha(180)
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       if (isMe) ...[
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 4),
                         Icon(
                           message.readAt != null
-                              ? Icons.done_all
-                              : Icons.done,
-                          size: 13,
-                          color:
-                              theme.colorScheme.onPrimary.withAlpha(160),
+                              ? Icons.done_all_rounded
+                              : Icons.done_rounded,
+                          size: 14,
+                          color: Colors.white.withAlpha(180),
                         ),
                       ],
                     ],

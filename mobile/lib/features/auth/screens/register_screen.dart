@@ -116,17 +116,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 24),
 
                 Text(
-                  'Create Account',
+                  'Join The Swap.',
                   style: theme.textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.0,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join the sustainable fashion community',
+                  'Create your account to start rescuing clothes',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 36),

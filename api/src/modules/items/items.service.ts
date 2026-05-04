@@ -5,20 +5,19 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { StorageService } from '../../common/storage/storage.service';
+import { LocalStorageService } from '../../common/storage/local-storage.service';
 import { CreateItemDto, UpdateItemDto } from './dto';
 import { MatchStatus } from '@prisma/client';
 
 const ITEM_INCLUDE = {
-  photos: { orderBy: { sortOrder: 'asc' as const } },
-  verification: true,
+  photos: true,
 };
 
 @Injectable()
 export class ItemsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
+    private readonly storage: LocalStorageService,
   ) {}
 
   async create(userId: string, dto: CreateItemDto) {
@@ -74,6 +73,27 @@ export class ItemsService {
       this.prisma.item.count({ where }),
     ]);
 
+    return { data, meta: { page, limit, total } };
+  }
+
+  async findLikedByOwner(
+    userId: string,
+    query: { page: number; limit: number },
+  ) {
+    const { page = 1, limit = 20 } = query;
+
+    const [likes, total] = await Promise.all([
+      this.prisma.like.findMany({
+        where: { likerId: userId, isLike: true, item: { status: 'available' } },
+        include: { item: { include: ITEM_INCLUDE } },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.like.count({ where: { likerId: userId, isLike: true, item: { status: 'available' } } }),
+    ]);
+
+    const data = likes.map(like => like.item);
     return { data, meta: { page, limit, total } };
   }
 
@@ -201,6 +221,23 @@ export class ItemsService {
       totalMatches,
       activeMatches,
     };
+  }
+
+  async addPhoto(itemId: string, userId: string, publicUrl: string, key: string) {
+    const item = await this.findOne(itemId);
+    if (item.ownerId !== userId) {
+      throw new ForbiddenException('You can only add photos to your own items');
+    }
+
+    const photo = await this.prisma.itemPhoto.create({
+      data: {
+        itemId,
+        url: publicUrl,
+        thumbnailUrl: publicUrl,
+      },
+    });
+
+    return { id: photo.id, url: photo.url };
   }
 
   async removePhoto(itemId: string, photoId: string, userId: string) {

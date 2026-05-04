@@ -139,6 +139,23 @@ class _RatingItem extends StatelessWidget {
                         ),
                       ),
                       _StarRow(score: rating.score),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 16),
+                        padding: EdgeInsets.zero,
+                        onSelected: (value) {
+                          if (value == 'report') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Review reported')),
+                            );
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(
+                            value: 'report',
+                            child: Text('Report Review'),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   if (rating.comment != null) ...[

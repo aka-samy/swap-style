@@ -47,6 +47,14 @@ class MatchingRepository {
     });
     return Match.fromJson(response.data);
   }
+
+  Future<void> rateUser(String matchId, String rateeId, int score, String? comment) async {
+    await _client.dio.post('/matches/$matchId/rating', data: {
+      'rateeId': rateeId,
+      'score': score,
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+    });
+  }
 }
 
 class PaginatedMatches {

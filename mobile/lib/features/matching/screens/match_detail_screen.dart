@@ -8,6 +8,7 @@ import '../../../core/models/match.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../data/matching_repository.dart';
 import '../providers/matching_provider.dart';
+import '../providers/counter_offer_provider.dart';
 import 'propose_offer_screen.dart';
 
 final _matchDetailProvider =
@@ -16,12 +17,19 @@ final _matchDetailProvider =
   return MatchingRepository(client).getMatch(matchId);
 });
 
-class MatchDetailScreen extends ConsumerWidget {
+class MatchDetailScreen extends ConsumerStatefulWidget {
   final String matchId;
   const MatchDetailScreen({super.key, required this.matchId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MatchDetailScreen> createState() => _MatchDetailScreenState();
+}
+
+class _MatchDetailScreenState extends ConsumerState<MatchDetailScreen> {
+  String get matchId => widget.matchId;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final matchAsync = ref.watch(_matchDetailProvider(matchId));
 
@@ -50,7 +58,7 @@ class MatchDetailScreen extends ConsumerWidget {
 
   Widget _buildContent(
       BuildContext context, WidgetRef ref, ThemeData theme, Match match) {
-    final currentUserId = ref.watch(authProvider).userId;
+    final currentUserId = ref.watch(authProvider).userId ?? '';
     final isUserA = currentUserId == match.userAId;
     final otherUserId = isUserA ? match.userBId : match.userAId;
     final otherDisplayName =
@@ -133,13 +141,16 @@ class MatchDetailScreen extends ConsumerWidget {
                                 color: theme.colorScheme.onSurfaceVariant,
                               )),
                           const SizedBox(height: 6),
-                          _StatusChip(status: match.status),
+                          _StatusChip(match: match, currentUserId: currentUserId),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
 
                     // Actions
+                    if (match.status == MatchStatus.completed) ...[
+                      // Rating feature coming soon
+                    ] else ...[
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
@@ -187,6 +198,9 @@ class MatchDetailScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    _CounterOffersSection(matchId: matchId),
+                    const SizedBox(height: 10),
+                    ],
                     TextButton(
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
@@ -286,16 +300,20 @@ class _ItemPreview extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final MatchStatus status;
-  const _StatusChip({required this.status});
+  final Match match;
+  final String currentUserId;
+  const _StatusChip({required this.match, required this.currentUserId});
 
   @override
   Widget build(BuildContext context) {
-    final (color, label) = switch (status) {
+    final isUserA = currentUserId == match.userAId;
+    final hasConfirmed = isUserA ? match.userAConfirmed : match.userBConfirmed;
+
+    final (color, label) = switch (match.status) {
       MatchStatus.pending => (Colors.orange, 'Pending'),
       MatchStatus.negotiating => (Colors.blue, 'Negotiating'),
-      MatchStatus.agreed => (Colors.green, 'Agreed'),
-      MatchStatus.awaitingConfirmation => (Colors.purple, 'Awaiting Confirmation'),
+      MatchStatus.agreed => hasConfirmed ? (Colors.purple, 'Waiting for other side') : (Colors.green, 'Agreed'),
+      MatchStatus.awaitingConfirmation => (Colors.purple, hasConfirmed ? 'Waiting for other side' : 'Needs your confirmation'),
       MatchStatus.completed => (Colors.teal, 'Completed'),
       MatchStatus.canceled => (Colors.grey, 'Canceled'),
       MatchStatus.expired => (Colors.red, 'Expired'),
@@ -310,6 +328,144 @@ class _StatusChip extends StatelessWidget {
       child: Text(label,
           style: TextStyle(
               fontSize: 14, color: color, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _CounterOffersSection extends ConsumerStatefulWidget {
+  final String matchId;
+  const _CounterOffersSection({required this.matchId});
+
+  @override
+  ConsumerState<_CounterOffersSection> createState() => _CounterOffersSectionState();
+}
+
+class _CounterOffersSectionState extends ConsumerState<_CounterOffersSection> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(counterOfferProvider(widget.matchId).notifier).load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(counterOfferProvider(widget.matchId));
+    final theme = Theme.of(context);
+
+    if (state.isLoading && state.offers.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (state.offers.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text('Counter Offers', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        ),
+        ...state.offers.map((offer) {
+          final amountText = offer.monetaryAmount != null && offer.monetaryAmount! > 0 
+              ? '\$${offer.monetaryAmount!.toStringAsFixed(2)}' 
+              : '';
+          final itemsText = offer.items.isNotEmpty ? '${offer.items.length} items' : '';
+          final titleParts = [if (amountText.isNotEmpty) amountText, if (itemsText.isNotEmpty) itemsText];
+          final title = titleParts.isEmpty ? 'Trade Offer' : titleParts.join(' + ');
+
+          return Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(Icons.compare_arrows_rounded, color: theme.colorScheme.primary),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: offer.message != null && offer.message!.isNotEmpty 
+                  ? Text('"${offer.message}"', style: const TextStyle(fontStyle: FontStyle.italic))
+                  : null,
+              trailing: Chip(
+                label: Text(offer.status.name.toUpperCase(), style: const TextStyle(fontSize: 10)),
+                padding: EdgeInsets.zero,
+                backgroundColor: offer.status.name == 'pending' ? Colors.orange.withAlpha(50) : null,
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Future<void> _showRatingDialog(BuildContext context, WidgetRef ref, String matchId, String rateeId) async {
+    int score = 5;
+    String comment = '';
+    
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Rate User'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('How was your swap experience?'),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    onPressed: () => setState(() => score = index + 1),
+                    icon: Icon(
+                      index < score ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: Colors.amber,
+                      size: 36,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Comment (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                onChanged: (val) => comment = val,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  await ref.read(matchingRepositoryProvider).rateUser(matchId, rateeId, score, comment);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Rating submitted successfully!')),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to submit rating.')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -77,18 +77,12 @@ class ApiClient {
   }
 
   static String _defaultBaseUrl() {
-    if (kReleaseMode) {
-      return 'https://swap-style-production.up.railway.app/api/v1';
-    }
-
     if (Platform.isAndroid) {
-      // Using physical network IP so physical devices can reach the local server
-      return 'http://192.168.1.166:3001/api/v1';
+      return 'http://192.168.1.50:3001/api/v1';
     }
 
     if (Platform.isIOS) {
-      // Using physical network IP so physical devices can reach the local server
-      return 'http://192.168.1.166:3001/api/v1';
+      return 'http://192.168.1.50:3001/api/v1';
     }
 
     return 'http://localhost:3001/api/v1';

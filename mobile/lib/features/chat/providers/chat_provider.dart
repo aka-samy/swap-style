@@ -45,7 +45,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void _handleNewMessage(Message message) {
     if (message.matchId == matchId) {
-      state = state.copyWith(messages: [message, ...state.messages]);
+      if (!state.messages.any((m) => m.id == message.id)) {
+        state = state.copyWith(messages: [message, ...state.messages]);
+      }
     }
   }
 
@@ -77,7 +79,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> send(String text) async {
     try {
       final message = await _repository.sendMessage(matchId, text);
-      state = state.copyWith(messages: [message, ...state.messages]);
+      if (!state.messages.any((m) => m.id == message.id)) {
+        state = state.copyWith(messages: [message, ...state.messages]);
+      }
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -89,6 +93,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   Future<void> markRead() async {
     await _repository.markRead(matchId).catchError((_) {});
+  }
+
+  Future<Message?> getLastMessage(String matchId) async {
+    return _repository.getLastMessage(matchId);
   }
 
   Future<void> joinRoom() async {

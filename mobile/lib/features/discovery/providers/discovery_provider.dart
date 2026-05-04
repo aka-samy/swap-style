@@ -11,6 +11,7 @@ class DiscoveryState {
   final bool hasLoadedOnce;
   final String? error;
   final int currentPage;
+  final List<FeedItem> recentPasses;
 
   const DiscoveryState({
     this.cards = const [],
@@ -19,6 +20,7 @@ class DiscoveryState {
     this.hasLoadedOnce = false,
     this.error,
     this.currentPage = 1,
+    this.recentPasses = const [],
   });
 
   DiscoveryState copyWith({
@@ -28,6 +30,7 @@ class DiscoveryState {
     bool? hasLoadedOnce,
     String? error,
     int? currentPage,
+    List<FeedItem>? recentPasses,
   }) {
     return DiscoveryState(
       cards: cards ?? this.cards,
@@ -36,6 +39,7 @@ class DiscoveryState {
       hasLoadedOnce: hasLoadedOnce ?? this.hasLoadedOnce,
       error: error,
       currentPage: currentPage ?? this.currentPage,
+      recentPasses: recentPasses ?? this.recentPasses,
     );
   }
 }
@@ -126,10 +130,16 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
 
   Future<SwipeResult?> swipe(String itemId, String action) async {
     try {
+      final itemToPass = state.cards.firstWhere((c) => c.id == itemId);
       final result = await _repository.swipe(itemId: itemId, action: action);
+      
+      List<FeedItem> newRecentPasses = List.from(state.recentPasses);
+      newRecentPasses.add(itemToPass);
+      
       // Remove the swiped card from the stack
       state = state.copyWith(
         cards: state.cards.where((c) => c.id != itemId).toList(),
+        recentPasses: newRecentPasses,
       );
       return result;
     } catch (e) {
@@ -142,6 +152,19 @@ class DiscoveryNotifier extends StateNotifier<DiscoveryState> {
       );
       return null;
     }
+  }
+
+  /// Undo last pass
+  void undoLastPass() {
+    if (state.recentPasses.isEmpty) return;
+    
+    final item = state.recentPasses.last;
+    final updatedPasses = List<FeedItem>.from(state.recentPasses)..removeLast();
+    
+    state = state.copyWith(
+      cards: [item, ...state.cards],
+      recentPasses: updatedPasses,
+    );
   }
 
   /// Re-insert a card at the front (visual undo only)

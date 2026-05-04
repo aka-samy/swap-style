@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../core/providers/locale_provider.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/rating.dart';
 import '../../../core/models/item.dart';
@@ -304,15 +306,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               ),
               const SizedBox(width: 4),
               IconButton(
-                tooltip: 'Achievements',
-                onPressed: () => context.go('/profile/achievements'),
-                icon: const Icon(Icons.emoji_events_outlined),
-                style: IconButton.styleFrom(
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
                 tooltip: 'Settings',
                 onPressed: () => _showSettingsSheet(),
                 icon: const Icon(Icons.settings_outlined),
@@ -442,6 +435,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ],
         ),
         const SizedBox(height: 12),
+        SizedBox(
+          width: 200,
+          child: FilledButton.tonalIcon(
+            onPressed: () => context.push('/profile/liked'),
+            icon: const Icon(Icons.favorite_rounded, color: Colors.pink),
+            label: const Text('My Likes'),
+          ),
+        ),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -566,53 +568,92 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   void _showSettingsSheet() {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).padding.bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Edit Profile'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startEditing();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.dark_mode_outlined),
+                title: const Text('Dark Mode'),
+                trailing: Switch(
+                  value: ref.read(themeProvider) == ThemeMode.dark,
+                  onChanged: (value) {
+                    ref.read(themeProvider.notifier).setTheme(value ? ThemeMode.dark : ThemeMode.light);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.language_outlined),
+                title: const Text('Language'),
+                trailing: Text(ref.read(localeProvider).languageCode == 'ar' ? 'العربية' : 'English', 
+                    style: const TextStyle(color: Colors.grey)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showLanguageDialog();
+                },
+              ),
+              if (ref.read(authProvider).isAdmin)
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Admin Panel'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push('/admin');
+                  },
+                ),
+              const Divider(),
+              ListTile(
+                leading: Icon(Icons.logout, color: theme.colorScheme.error),
+                title: Text('Sign Out', style: TextStyle(color: theme.colorScheme.error)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ref.read(authProvider.notifier).signOut();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLanguageDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Language'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Edit Profile'),
+              title: const Text('English'),
+              leading: ref.read(localeProvider).languageCode == 'en' ? const Icon(Icons.check, color: Colors.green) : null,
               onTap: () {
+                ref.read(localeProvider.notifier).setLocale(const Locale('en'));
                 Navigator.pop(ctx);
-                _startEditing();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Messages'),
+              title: const Text('العربية (Arabic)'),
+              leading: ref.read(localeProvider).languageCode == 'ar' ? const Icon(Icons.check, color: Colors.green) : null,
               onTap: () {
+                ref.read(localeProvider.notifier).setLocale(const Locale('ar'));
                 Navigator.pop(ctx);
-                context.go('/chats');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.notifications_outlined),
-              title: const Text('Notifications'),
-              onTap: () {
-                Navigator.pop(ctx);
-                context.go('/profile/notifications');
-              },
-            ),
-            if (ref.read(authProvider).isAdmin)
-              ListTile(
-                leading: const Icon(Icons.admin_panel_settings_outlined),
-                title: const Text('Admin Panel'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.go('/admin');
-                },
-              ),
-            const Divider(),
-            ListTile(
-              leading: Icon(Icons.logout, color: theme.colorScheme.error),
-              title: Text('Sign Out',
-                  style: TextStyle(color: theme.colorScheme.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                ref.read(authProvider.notifier).signOut();
               },
             ),
           ],
@@ -620,6 +661,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       ),
     );
   }
+
 
   Future<void> _showOwnItemActions(Item item) async {
     final itemRepo = ref.read(itemsRepositoryProvider);

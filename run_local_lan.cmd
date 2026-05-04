@@ -29,4 +29,6 @@ if errorlevel 1 (
 echo Starting API on 0.0.0.0:3001...
 npm run start:dev
 
+echo.
+pause
 endlocal

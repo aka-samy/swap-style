@@ -42,6 +42,11 @@ export class ChatService {
       include: { sender: { select: { id: true, displayName: true, profilePhotoUrl: true } } },
     });
 
+    await this.prisma.match.update({
+      where: { id: matchId },
+      data: { lastActivityAt: new Date() },
+    });
+
     if (this.server) {
       this.server.to(`match:${matchId}`).emit('new_message', message);
     }

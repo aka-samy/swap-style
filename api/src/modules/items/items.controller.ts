@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Controller,
   Get,
@@ -11,18 +13,25 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ItemsService } from './items.service';
 import { CreateItemDto, UpdateItemDto, PaginationQueryDto } from './dto';
 import { FirebaseAuthGuard } from '../../common/guards/firebase-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { LocalStorageService } from '../../common/storage/local-storage.service';
 
 @ApiTags('Items')
-@ApiBearerAuth()
-@UseGuards(FirebaseAuthGuard)
 @Controller('items')
+@UseGuards(FirebaseAuthGuard)
+@ApiBearerAuth()
 export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
+  constructor(
+    private readonly itemsService: ItemsService,
+    private readonly storageService: LocalStorageService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new item listing' })
@@ -34,7 +43,17 @@ export class ItemsController {
   @Get('me')
   @ApiOperation({ summary: 'List authenticated user closet items' })
   async findMyItems(@Req() req: any, @Query() query: PaginationQueryDto) {
+    console.log('findMyItems called, userId:', req.user?.userId);
     return this.itemsService.findByOwner(req.user.userId, {
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+    });
+  }
+
+  @Get('liked')
+  @ApiOperation({ summary: 'List authenticated user liked items' })
+  async findLikedItems(@Req() req: any, @Query() query: PaginationQueryDto) {
+    return this.itemsService.findLikedByOwner(req.user.userId, {
       page: query.page ?? 1,
       limit: query.limit ?? 20,
     });
@@ -90,7 +109,57 @@ export class ItemsController {
     @Req() req: any,
     @Body() body: { contentType: string },
   ) {
-    return this.itemsService.getPresignedUploadUrl(id, req.user.userId, body.contentType);
+    const key = `item-${id}-${Date.now()}.jpg`;
+    return { 
+      uploadUrl: `http://192.168.1.50:3001/api/v1/items/${id}/photos/upload-simple`, 
+      publicUrl: `http://192.168.1.50:3001/uploads/${key}`, 
+      key 
+    };
+  }
+
+  @Post(':id/photos/upload-simple')
+  @UseGuards(FirebaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload photo via JSON body (base64)' })
+  async uploadPhotoSimple(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: { imageData: string; contentType: string },
+  ) {
+    console.log('uploadPhotoSimple called, id:', id);
+    try {
+      const buffer = Buffer.from(body.imageData, 'base64');
+      const filename = `item-${id}-${Date.now()}.jpg`;
+      const filepath = path.join(process.cwd(), 'uploads', filename);
+      fs.writeFileSync(filepath, buffer);
+      const publicUrl = `http://192.168.1.50:3001/uploads/${filename}`;
+      return this.itemsService.addPhoto(id, req.user.userId, publicUrl, filename);
+    } catch (e) {
+      console.error('uploadPhotoSimple error:', e);
+      throw e;
+    }
+  }
+
+  @Post(':id/photos/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiBearerAuth()
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Upload a photo directly to local storage' })
+  async uploadPhoto(
+    @Param('id') id: string,
+    @Req() req: any,
+    @UploadedFile() file: any,
+  ) {
+    console.log('uploadPhoto called, file:', file?.originalname);
+    try {
+      const key = await this.storageService.uploadFile('', file.buffer, file.mimetype);
+      const publicUrl = this.storageService.getPublicUrl(key);
+      console.log('uploadPhoto success, key:', key, 'url:', publicUrl);
+      return this.itemsService.addPhoto(id, req.user.userId, publicUrl, key);
+    } catch (e) {
+      console.error('uploadPhoto error:', e);
+      throw e;
+    }
   }
 
   @Delete(':id/photos/:photoId')

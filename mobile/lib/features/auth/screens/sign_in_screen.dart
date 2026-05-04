@@ -101,33 +101,52 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 const SizedBox(height: 60),
 
                 // Logo area
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withAlpha(25),
-                    borderRadius: BorderRadius.circular(24),
+                Center(
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.secondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.all_inclusive_rounded,
+                        size: 48, color: Colors.white),
                   ),
-                  child: Icon(Icons.swap_horiz_rounded,
-                      size: 44, color: theme.colorScheme.primary),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 32),
 
                 Text(
-                  'Welcome back',
+                  'Welcome Back.',
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.0,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to continue swapping',
+                  'Sign in to explore your style',
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 48),
 
                 if (error != null) ...[
                   Container(

@@ -115,6 +115,7 @@ class DiscoveryScreen extends ConsumerStatefulWidget {
 class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
     with SingleTickerProviderStateMixin {
   Offset _dragOffset = Offset.zero;
+  Axis? _dragAxis;
   bool _isDragging = false;
   bool _isBootstrappingFeed = true;
   late AnimationController _animController;
@@ -344,13 +345,19 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
 
   void _showNextCard() {
     ref.read(discoveryProvider.notifier).showNextCard();
-    setState(() => _dragOffset = Offset.zero);
+    setState(() {
+      _dragOffset = Offset.zero;
+      _dragAxis = null;
+    });
     _prefetchMoreIfNeeded();
   }
 
   void _showPreviousCard() {
     ref.read(discoveryProvider.notifier).showPreviousCard();
-    setState(() => _dragOffset = Offset.zero);
+    setState(() {
+      _dragOffset = Offset.zero;
+      _dragAxis = null;
+    });
   }
 
   Future<void> _prefetchMoreIfNeeded() async {
@@ -632,6 +639,19 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                             fontWeight: FontWeight.bold,
                           )),
                   const Spacer(),
+                  if (state.recentPasses.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Undo last pass',
+                      onPressed: () {
+                        ref.read(discoveryProvider.notifier).undoLastPass();
+                      },
+                      icon: const Icon(Icons.undo_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'Search items',
                     onPressed: _openSearch,
@@ -722,7 +742,11 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                   bottom: 8.0 * i,
                   child: Opacity(
                     opacity: 1.0 - (i * 0.15),
-                    child: ItemCard(item: cards[i]),
+                    child: ItemCard(
+                      item: _dragAxis == Axis.vertical && _dragOffset.dy > 0 && cards.length > i 
+                          ? cards[cards.length - i] 
+                          : cards[i],
+                    ),
                   ),
                 ),
               // Top card (draggable)
@@ -735,26 +759,40 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _openItemActions(cards.first),
-                    onPanStart: (_) => setState(() => _isDragging = true),
+                    onPanStart: (_) => setState(() {
+                      _isDragging = true;
+                      _dragAxis = null;
+                    }),
                     onPanUpdate: (details) {
                       setState(() {
                         _dragOffset += details.delta;
+                        if (_dragAxis == null && _dragOffset.distance > 10) {
+                          if (_dragOffset.dy.abs() > _dragOffset.dx.abs()) {
+                            _dragAxis = Axis.vertical;
+                          } else {
+                            _dragAxis = Axis.horizontal;
+                          }
+                        }
+                        if (_dragAxis == Axis.vertical) {
+                          _dragOffset = Offset(0, _dragOffset.dy);
+                        } else if (_dragAxis == Axis.horizontal) {
+                          _dragOffset = Offset(_dragOffset.dx, 0);
+                        }
                       });
                     },
                     onPanEnd: (details) {
-                      setState(() => _isDragging = false);
+                      final currentAxis = _dragAxis;
+                      setState(() {
+                        _isDragging = false;
+                        _dragAxis = null;
+                      });
                       const verticalThreshold = 70.0;
                       const verticalVelocityThreshold = 700.0;
                       final horizontalThreshold = screenWidth * 0.3;
                       final velocity = details.velocity.pixelsPerSecond;
-                      final horizontalDelta = _dragOffset.dx.abs();
                       final verticalDelta = _dragOffset.dy.abs();
-                      final isVerticalDrag =
-                          verticalDelta > (horizontalDelta * 0.7) ||
-                          velocity.dy.abs() >
-                              (velocity.dx.abs() * 1.2);
 
-                      if (isVerticalDrag &&
+                      if (currentAxis == Axis.vertical &&
                           canNavigateVertically &&
                           (verticalDelta > verticalThreshold ||
                               velocity.dy.abs() >
@@ -767,7 +805,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                         return;
                       }
 
-                      if (_dragOffset.dx.abs() > horizontalThreshold) {
+                      if (currentAxis == Axis.horizontal && _dragOffset.dx.abs() > horizontalThreshold) {
                         final action =
                             _dragOffset.dx > 0 ? 'like' : 'pass';
                         _animateSwipe(cards.first, action);
@@ -783,32 +821,35 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                         child: Stack(
                           children: [
                             ItemCard(item: cards.first),
-                            // Like/Pass overlay
                             if (_isDragging && _dragOffset.dx.abs() > 30)
                               Positioned(
-                                top: 24,
-                                left: _dragOffset.dx > 0 ? 24 : null,
-                                right: _dragOffset.dx < 0 ? 24 : null,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: _dragOffset.dx > 0
-                                        ? Colors.green
-                                        : Colors.red,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 2,
+                                top: 40,
+                                left: _dragOffset.dx > 0 ? 32 : null,
+                                right: _dragOffset.dx < 0 ? 32 : null,
+                                child: Transform.rotate(
+                                  angle: _dragOffset.dx > 0 ? -0.15 : 0.15,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: _dragOffset.dx > 0
+                                            ? Colors.greenAccent.shade400
+                                            : Colors.redAccent.shade400,
+                                        width: 4,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                  ),
-                                  child: Text(
-                                    _dragOffset.dx > 0 ? 'LIKE' : 'PASS',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 20,
-                                      letterSpacing: 2,
+                                    child: Text(
+                                      _dragOffset.dx > 0 ? 'LIKE' : 'NOPE',
+                                      style: TextStyle(
+                                        color: _dragOffset.dx > 0
+                                            ? Colors.greenAccent.shade400
+                                            : Colors.redAccent.shade400,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 32,
+                                        letterSpacing: 2,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -818,31 +859,29 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
                                 _dragOffset.dy.abs() > 40 &&
                                 _dragOffset.dy.abs() > _dragOffset.dx.abs())
                               Positioned(
-                                top: _dragOffset.dy < 0 ? 24 : null,
-                                bottom: _dragOffset.dy > 0 ? 24 : null,
-                                left: 24,
-                                right: 24,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 2,
+                                top: _dragOffset.dy < 0 ? 40 : null,
+                                bottom: _dragOffset.dy > 0 ? 40 : null,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueAccent.withAlpha(220),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                  ),
-                                  child: Text(
-                                    _dragOffset.dy < 0
-                                        ? 'NEXT ITEM'
-                                        : 'PREVIOUS ITEM',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
-                                      letterSpacing: 1,
+                                    child: Text(
+                                      _dragOffset.dy < 0
+                                          ? 'NEXT ITEM'
+                                          : 'PREVIOUS ITEM',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        letterSpacing: 1,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -856,106 +895,8 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen>
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        // Action buttons
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _ActionButton(
-                icon: Icons.skip_previous_rounded,
-                tooltip: 'Previous item',
-                color: Colors.amber,
-                size: 44,
-                iconSize: 24,
-                onTap: cards.length > 1 ? _showPreviousCard : null,
-              ),
-              const SizedBox(width: 14),
-              _ActionButton(
-                icon: Icons.close_rounded,
-                tooltip: 'Pass item',
-                color: Colors.red,
-                size: 56,
-                iconSize: 28,
-                onTap: cards.isEmpty
-                    ? null
-                    : () => _animateSwipe(cards.first, 'pass'),
-              ),
-              const SizedBox(width: 14),
-              _ActionButton(
-                icon: Icons.skip_next_rounded,
-                tooltip: 'Next item',
-                color: Colors.blue,
-                size: 44,
-                iconSize: 24,
-                onTap: cards.length > 1 ? _showNextCard : null,
-              ),
-              const SizedBox(width: 14),
-              _ActionButton(
-                icon: Icons.favorite_rounded,
-                tooltip: 'Like item',
-                color: Colors.green,
-                size: 56,
-                iconSize: 28,
-                onTap: cards.isEmpty
-                    ? null
-                    : () => _animateSwipe(cards.first, 'like'),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          'Tip: swipe up/down to browse next or previous item',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        const SizedBox(height: 8),
       ],
     );
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final Color color;
-  final double size;
-  final double iconSize;
-  final VoidCallback? onTap;
-
-  const _ActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.color,
-    required this.size,
-    required this.iconSize,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          opacity: enabled ? 1.0 : 0.4,
-          duration: const Duration(milliseconds: 200),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withAlpha(25),
-              border: Border.all(color: color.withAlpha(80), width: 2),
-            ),
-            child: Icon(icon, color: color, size: iconSize),
-          ),
-        ),
-      ),
-    );
-  }
-}

@@ -321,7 +321,14 @@ export class DiscoveryService {
     const existing = await this.prisma.like.findFirst({
       where: { likerId: userId, itemId },
     });
-    if (existing) throw new BadRequestException('Already swiped on this item');
+    
+    if (existing) {
+      if ((existing.isLike && action === 'like') || (!existing.isLike && action === 'pass')) {
+        return { matched: false };
+      }
+      // Different action, delete the old one
+      await this.prisma.like.delete({ where: { id: existing.id } });
+    }
 
     if (action === 'pass') {
       // Record pass as a like with isLike=false for tracking

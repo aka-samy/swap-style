@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/api/api_error_mapper.dart';
@@ -46,6 +48,75 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
     47,
     48,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+  }
+
+  Future<void> _loadDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final draft = prefs.getString('item_draft');
+    if (draft != null) {
+      try {
+        final data = jsonDecode(draft) as Map<String, dynamic>;
+        setState(() {
+          _titleController.text = data['title'] ?? '';
+          _notesController.text = data['notes'] ?? '';
+          _category = ItemCategory.values.firstWhere(
+            (c) => c.apiValue == data['category'],
+            orElse: () => ItemCategory.shirt,
+          );
+          _size = ItemSize.values.firstWhere(
+            (s) => s.apiValue == data['size'],
+            orElse: () => ItemSize.m,
+          );
+          if (data['shoeSizeEu'] != null) {
+            _shoeSizeEu = (data['shoeSizeEu'] as num).toDouble();
+          }
+          _condition = ItemCondition.values.firstWhere(
+            (c) => c.apiValue == data['condition'],
+            orElse: () => ItemCondition.good,
+          );
+          final paths = data['photos'] as List<dynamic>?;
+          if (paths != null) {
+            _photos.addAll(paths.map((p) => File(p.toString())).where((f) => f.existsSync()));
+          }
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Draft loaded')),
+          );
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = {
+      'title': _titleController.text.trim(),
+      'notes': _notesController.text.trim(),
+      'category': _category.apiValue,
+      'size': _size.apiValue,
+      'shoeSizeEu': _shoeSizeEu,
+      'condition': _condition.apiValue,
+      'photos': _photos.map((f) => f.path).toList(),
+    };
+    await prefs.setString('item_draft', jsonEncode(data));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Draft saved! You can resume it later.')),
+      );
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('item_draft');
+  }
 
   @override
   void dispose() {
@@ -196,6 +267,8 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
           ),
         );
       }
+      ref.read(itemsProvider.notifier).loadMyItems();
+      await _clearDraft();
       Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -474,21 +547,40 @@ class _AddItemScreenState extends ConsumerState<AddItemScreen> {
             
             const SizedBox(height: 32),
 
-            FilledButton(
-              onPressed: _isSubmitting ? null : _submit,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSubmitting ? null : _saveDraft,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text('Save Draft', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
                 ),
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('List Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _isSubmitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('List Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
           ],
